@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Booking confirmed{% endblock %}
+{% block content %}
+<section class="page-section shell narrow confirmation">
+  <div class="success-mark" aria-hidden="true">✓</div>
+  <p class="eyebrow">BOOKING CONFIRMED</p>
+  <h1>A place with your name on it.</h1>
+  <p class="lede">{{ adoption.bench_id }} is now reserved. Thank you for giving this little place a story.</p>
+  <div class="review-panel"><div class="review-head"><span class="eyebrow">YOUR ADOPTION</span><strong>{{ adoption.bench_id }}</strong><small>{{ adoption.location }}</small></div>
+    <dl class="detail-list"><div><dt>Public name</dt><dd>{{ adoption.public_name }}</dd></div><div><dt>Start date</dt><dd>{{ adoption.start_date }}</dd></div><div><dt>End date</dt><dd>{{ adoption.end_date }}</dd></div><div><dt>Recorded amount</dt><dd>{{ money(adoption.amount_cents) }}</dd></div></dl>
+  </div>
+  <p class="notice"><strong>No payment was taken.</strong> This is a demonstration booking only.</p>
+  <a class="button button-dark wide" href="{{ url_for('bench_detail', bench_id=adoption.bench_id) }}">View your bench <span aria-hidden="true">→</span></a>
+</section>
+{% endblock %}

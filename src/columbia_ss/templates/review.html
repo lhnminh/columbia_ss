@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Review {{ bench.id }} booking{% endblock %}
+{% block content %}
+<section class="page-section shell narrow">
+  <a class="back-link" href="{{ url_for('adoption_form', bench_id=bench.id) }}">← Edit details</a>
+  <p class="eyebrow">STEP 02 / 02 · REVIEW</p>
+  <h1>One last look.</h1>
+  <p class="lede">Check the details below. Confirming will reserve this bench immediately, even if your start date is in the future.</p>
+  <div class="review-panel"><div class="review-head"><span class="eyebrow">YOUR BENCH</span><strong>{{ bench.id }}</strong><small>{{ bench.location }}</small></div>
+    <dl class="detail-list"><div><dt>Public name</dt><dd>{{ public_name }}</dd></div><div><dt>Start date</dt><dd>{{ start_date }}</dd></div><div><dt>End date</dt><dd>{{ end_date }}</dd></div><div><dt>Recorded amount</dt><dd>{{ money(amount_cents) }}</dd></div></dl>
+  </div>
+  <p class="notice">This is a demo booking. No payment is collected or processed.</p>
+  <form method="post" action="{{ url_for('confirm_adoption', bench_id=bench.id) }}">
+    <input type="hidden" name="public_name" value="{{ public_name }}"><input type="hidden" name="start_date" value="{{ start_date }}"><input type="hidden" name="end_date" value="{{ end_date }}"><input type="hidden" name="amount" value="{{ amount }}">
+    <button class="button button-dark wide" type="submit">Confirm adoption <span aria-hidden="true">→</span></button>
+  </form>
+</section>
+{% endblock %}

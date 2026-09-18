@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ bench.id }}{% endblock %}
+{% block content %}
+<section class="page-section shell">
+  <a class="back-link" href="{{ url_for('directory') }}#browse">← All benches</a>
+  <div class="detail-grid">
+    <div class="detail-visual"><span class="detail-kicker">A PLACE TO PAUSE</span><span class="detail-big">{{ bench.id }}</span><span class="detail-location">{{ bench.location }}</span><span class="detail-shape" aria-hidden="true">⌁</span></div>
+    <div class="detail-content">
+      <p class="eyebrow">BENCH DETAILS</p>
+      <h1>{{ bench.id }}</h1>
+      <p class="lede">A small place to pause, reflect, and make a lasting memory.</p>
+      <span class="status {{ 'status-adopted' if bench.adoption_id else 'status-available' }}">{{ 'Adopted' if bench.adoption_id else 'Available' }}</span>
+      <dl class="detail-list"><div><dt>Location</dt><dd>{{ bench.location }}</dd></div>
+      {% if bench.adoption_id %}<div><dt>Adopted by</dt><dd>{{ bench.public_name }}</dd></div><div><dt>Adoption dates</dt><dd>{{ bench.start_date }} – {{ bench.end_date }}</dd></div>{% endif %}
+      </dl>
+      {% if bench.adoption_id %}<p class="notice">This bench is currently adopted or reserved. It will become available after {{ bench.end_date }}.</p>
+      {% else %}<a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=bench.id) }}">Adopt this bench <span aria-hidden="true">→</span></a><p class="fine-print">Choose your own dates and amount. No payment is collected.</p>{% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

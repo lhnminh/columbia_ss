@@ -1,13 +1,13 @@
 [project]
 name = "columbia-ss"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bench adoption demo"
 readme = "README.md"
 authors = [
     { name = "Minh Le", email = "lehnminh@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["Flask>=3.1,<4"]
 
 [project.scripts]
 columbia-ss = "columbia_ss:main"

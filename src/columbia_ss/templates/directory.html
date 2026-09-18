@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Explore benches{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="shell hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow light">A PLACE TO PAUSE</p>
+      <h1>A bench can hold <em>a story.</em></h1>
+      <p>Find a place of your own in our fictional Van Cortlandt Park bench adoption demo. Explore the collection, then choose a bench to adopt.</p>
+      <a class="button button-light" href="#browse">Explore the benches <span aria-hidden="true">↓</span></a>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div>
+      <div class="bench-illustration"><i class="slat back-one"></i><i class="slat back-two"></i><i class="slat seat"></i><i class="leg left"></i><i class="leg right"></i></div>
+      <span class="art-caption">A MOMENT, MADE YOURS.</span>
+    </div>
+  </div>
+</section>
+<section class="numbers shell" aria-label="Bench collection summary">
+  <div><strong>{{ bench_count }}</strong><span>fictional benches</span></div>
+  <div><strong>{{ bench_count - adopted_count }}</strong><span>available to adopt</span></div>
+  <div><strong>{{ adopted_count }}</strong><span>adopted or reserved</span></div>
+</section>
+<section class="browse shell" id="browse">
+  <div class="section-heading"><div><p class="eyebrow">THE COLLECTION</p><h2>Find your bench.</h2></div><p>Every bench here is sample data for this demo.</p></div>
+  <form class="search-bar" method="get" action="{{ url_for('directory') }}#browse" role="search">
+    <label for="q">Search by bench or demo location</label>
+    <div class="search-controls"><input id="q" name="q" type="search" placeholder="Try Bench42 or Demo Zone 3" value="{{ search }}"><button class="button button-dark" type="submit">Search <span aria-hidden="true">→</span></button></div>
+  </form>
+  <div class="browse-toolbar">
+    <div class="tabs" aria-label="Filter by status">
+      <a class="{{ 'selected' if status == '' else '' }}" href="{{ url_for('directory', q=search) }}#browse" {% if status == '' %}aria-current="page"{% endif %}>All benches</a>
+      <a class="{{ 'selected' if status == 'available' else '' }}" href="{{ url_for('directory', q=search, status='available') }}#browse" {% if status == 'available' %}aria-current="page"{% endif %}>Available</a>
+      <a class="{{ 'selected' if status == 'adopted' else '' }}" href="{{ url_for('directory', q=search, status='adopted') }}#browse" {% if status == 'adopted' %}aria-current="page"{% endif %}>Adopted</a>
+    </div>
+    <p>{{ total }} {{ 'bench' if total == 1 else 'benches' }} found</p>
+  </div>
+  {% if benches %}
+  <div class="bench-grid">
+    {% for bench in benches %}
+    <a class="bench-card" href="{{ url_for('bench_detail', bench_id=bench.id) }}">
+      <div class="card-top"><span class="bench-number">{{ bench.id }}</span><span class="status {{ 'status-adopted' if bench.adoption_id else 'status-available' }}">{{ 'Adopted' if bench.adoption_id else 'Available' }}</span></div>
+      <div class="card-icon" aria-hidden="true">▰</div>
+      <p class="card-location">{{ bench.location }}</p>
+      <div class="card-bottom"><span>{{ bench.public_name if bench.adoption_id else 'Ready for a new story' }}</span><span aria-hidden="true">↗</span></div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty-state"><h3>No benches found</h3><p>Try a different bench number, location, or status.</p><a href="{{ url_for('directory') }}#browse">Clear filters</a></div>{% endif %}
+  {% if pages > 1 %}<nav class="pagination" aria-label="Result pages">
+    {% if page > 1 %}<a href="{{ url_for('directory', q=search, status=status, page=page-1) }}#browse">← Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a href="{{ url_for('directory', q=search, status=status, page=page+1) }}#browse">Next →</a>{% endif %}
+  </nav>{% endif %}
+</section>
+{% endblock %}

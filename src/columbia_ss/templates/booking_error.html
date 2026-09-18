@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}Bench unavailable{% endblock %}
+{% block content %}
+<section class="page-section shell narrow"><p class="eyebrow">BOOKING UNAVAILABLE</p><h1>That bench was just adopted.</h1><p class="lede" role="alert">{{ error }}</p><p>Another booking was confirmed before yours. No adoption was created and no payment was taken.</p><a class="button button-dark" href="{{ url_for('directory', status='available') }}#browse">Explore available benches <span aria-hidden="true">→</span></a></section>
+{% endblock %}

@@ -34,6 +34,8 @@ The app uses three tables: `benches`, `adopters`, and `adoptions`. This is a dem
 
 ## Hosted demo on Vercel
 
+The public demo is available at <https://columbia-ss.vercel.app/>.
+
 The root `app.py` exports the Flask application for Vercel. Select the `columbia-ss` database in the Neon project, then set `DATABASE_URL` to its **pooled** Postgres connection string in both the Preview and Production Vercel environments. **Use the same database URL in both environments**: bookings and resets are shared. The app refuses to start on Vercel without `DATABASE_URL`, rather than writing to temporary SQLite storage. Keep the URL out of Git.
 
 After creating the Neon database, run these commands from the repository root with `DATABASE_URL` set in your shell:

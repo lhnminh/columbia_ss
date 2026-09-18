@@ -130,6 +130,7 @@ class DatabaseTests(unittest.TestCase):
             ("Alex", self.start, self.end, "1.234"),
             ("Alex", self.start, self.end, "NaN"),
             ("Alex", "2026-02-30", self.end, "10"),
+            ("Alex", self.start, (self.today + timedelta(days=91)).isoformat(), "10"),
         ]
         for name, start, end, amount in invalid:
             with self.subTest(name=name, start=start, end=end, amount=amount):

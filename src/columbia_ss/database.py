@@ -113,6 +113,8 @@ def validate_booking(
         raise BookingError("The start date cannot be before today.")
     if end <= start:
         raise BookingError("The end date must be after the start date.")
+    if end > (today or park_today()) + timedelta(days=90):
+        raise BookingError("The end date must be within 90 days of today.")
     if not AMOUNT_PATTERN.fullmatch(amount):
         raise BookingError("Enter an amount in USD with no more than two decimal places.")
     try:

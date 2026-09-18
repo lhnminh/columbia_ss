@@ -3,35 +3,32 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask, abort, g, redirect, render_template, request, url_for
 
-from .database import (
-    BenchUnavailable,
-    BookingError,
-    connect,
-    create_adoption,
-    get_adoption,
-    get_bench,
-    initialize_database,
-    list_benches,
-    park_today,
-    validate_booking,
-)
+from . import database, postgres
+from .database import BenchUnavailable, BookingError, park_today, validate_booking
 
 
 def create_app(database_path: str | Path | None = None) -> Flask:
-    """Construct the demo app and initialize its local database."""
-    app = Flask(__name__)
+    """Construct the app, using Postgres when DATABASE_URL is configured."""
+    static_folder = Path(__file__).resolve().parents[2] / "public" / "static"
+    app = Flask(__name__, static_folder=str(static_folder), static_url_path="/static")
+    app.config["DATABASE_URL"] = None if database_path else os.environ.get("DATABASE_URL")
     app.config["DATABASE"] = str(
         database_path or os.environ.get("COLUMBIA_SS_DB") or Path.cwd() / "instance" / "benches.sqlite3"
     )
-    initialize_database(app.config["DATABASE"])
+    if os.environ.get("VERCEL") and not app.config["DATABASE_URL"]:
+        raise RuntimeError("DATABASE_URL is required on Vercel; refusing to use local SQLite")
+    storage = postgres if app.config["DATABASE_URL"] else database
+    if storage is database:
+        database.initialize_database(app.config["DATABASE"])
 
     def db():
         if "database" not in g:
-            g.database = connect(app.config["DATABASE"])
+            g.database = storage.connect(app.config["DATABASE_URL"] or app.config["DATABASE"])
         return g.database
 
     @app.teardown_appcontext
@@ -42,8 +39,10 @@ def create_app(database_path: str | Path | None = None) -> Flask:
 
     @app.context_processor
     def template_helpers():
+        today = park_today()
         return {
-            "today": park_today().isoformat(),
+            "today": today.isoformat(),
+            "latest_end_date": (today + timedelta(days=90)).isoformat(),
             "money": lambda cents: f"${cents // 100:,}.{cents % 100:02d}",
         }
 
@@ -53,7 +52,7 @@ def create_app(database_path: str | Path | None = None) -> Flask:
         status = request.args.get("status", "")
         if status not in ("", "available", "adopted"):
             status = ""
-        all_benches = list_benches(db(), search=search, status=status)
+        all_benches = storage.list_benches(db(), search=search, status=status)
         try:
             page = max(1, int(request.args.get("page", "1")))
         except ValueError:
@@ -62,7 +61,7 @@ def create_app(database_path: str | Path | None = None) -> Flask:
         pages = max(1, (len(all_benches) + page_size - 1) // page_size)
         page = min(page, pages)
         benches = all_benches[(page - 1) * page_size : page * page_size]
-        counts = list_benches(db())
+        counts = storage.list_benches(db())
         adopted_count = sum(bench["adoption_id"] is not None for bench in counts)
         return render_template(
             "directory.html",
@@ -78,14 +77,14 @@ def create_app(database_path: str | Path | None = None) -> Flask:
 
     @app.get("/benches/<bench_id>")
     def bench_detail(bench_id: str):
-        bench = get_bench(db(), bench_id)
+        bench = storage.get_bench(db(), bench_id)
         if bench is None:
             abort(404)
         return render_template("bench.html", bench=bench)
 
     @app.get("/benches/<bench_id>/adopt")
     def adoption_form(bench_id: str):
-        bench = get_bench(db(), bench_id)
+        bench = storage.get_bench(db(), bench_id)
         if bench is None:
             abort(404)
         if bench["adoption_id"] is not None:
@@ -94,7 +93,7 @@ def create_app(database_path: str | Path | None = None) -> Flask:
 
     @app.post("/benches/<bench_id>/review")
     def review_adoption(bench_id: str):
-        bench = get_bench(db(), bench_id)
+        bench = storage.get_bench(db(), bench_id)
         if bench is None:
             abort(404)
         values = {
@@ -126,12 +125,12 @@ def create_app(database_path: str | Path | None = None) -> Flask:
             "amount": request.form.get("amount", ""),
         }
         try:
-            adoption_id = create_adoption(db(), bench_id, **values)
+            adoption_id = storage.create_adoption(db(), bench_id, **values)
         except BenchUnavailable as error:
-            bench = get_bench(db(), bench_id)
+            bench = storage.get_bench(db(), bench_id)
             return render_template("booking_error.html", bench=bench, error=str(error)), 409
         except BookingError as error:
-            bench = get_bench(db(), bench_id)
+            bench = storage.get_bench(db(), bench_id)
             if bench is None:
                 abort(404)
             return render_template("adopt.html", bench=bench, values=values, error=str(error)), 400
@@ -139,7 +138,7 @@ def create_app(database_path: str | Path | None = None) -> Flask:
 
     @app.get("/adoptions/<int:adoption_id>")
     def confirmation(adoption_id: int):
-        adoption = get_adoption(db(), adoption_id)
+        adoption = storage.get_adoption(db(), adoption_id)
         if adoption is None:
             abort(404)
         return render_template("confirmation.html", adoption=adoption)

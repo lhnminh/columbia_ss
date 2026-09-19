@@ -3,17 +3,29 @@
 from __future__ import annotations
 
 import os
+import random
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from flask import Flask, abort, g, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    abort,
+    g,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    url_for,
+)
 
 from . import postgres
 from .domain import BenchUnavailable, BookingError, park_today, validate_booking
 
 load_dotenv()
+
+IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
 
 
 def _as_date(value: date | str) -> date:
@@ -59,11 +71,22 @@ def create_app(
 ) -> Flask:
     """Construct the Postgres-backed application."""
     static_folder = Path(__file__).resolve().parents[2] / "public" / "static"
+    image_folder = Path(__file__).resolve().parents[2] / "img"
     app = Flask(__name__, static_folder=str(static_folder), static_url_path="/static")
+    app.config["BENCH_IMAGE_FOLDER"] = image_folder
     app.config["DATABASE_URL"] = database_url or os.environ.get("DATABASE_URL")
     if not app.config["DATABASE_URL"]:
         raise RuntimeError("DATABASE_URL is required")
     storage = storage_backend
+
+    def random_bench_image() -> str | None:
+        """Choose an image from the repository's bench image folder."""
+        image_names = sorted(
+            path.name
+            for path in app.config["BENCH_IMAGE_FOLDER"].iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        )
+        return random.choice(image_names) if image_names else None
 
     def db():
         if "database" not in g:
@@ -108,6 +131,11 @@ def create_app(
                 "latitude": bench["latitude"],
                 "longitude": bench["longitude"],
                 "available": bench["adoption_id"] is None,
+                "adoption_end_date": (
+                    _as_date(bench["end_date"]).isoformat()
+                    if bench["end_date"] is not None
+                    else None
+                ),
                 "detail_url": url_for("bench_detail", bench_id=bench["id"]),
                 "action_url": url_for(
                     "adoption_form" if bench["adoption_id"] is None else "bench_detail",
@@ -143,7 +171,16 @@ def create_app(
         bench = storage.get_bench(db(), bench_id)
         if bench is None:
             abort(404)
-        return render_template("bench.html", bench=bench)
+        return render_template(
+            "bench.html", bench=bench, bench_image=random_bench_image()
+        )
+
+    @app.get("/bench-images/<path:filename>")
+    def bench_image(filename: str):
+        """Serve an image selected from the repository's image folder."""
+        if Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
+            abort(404)
+        return send_from_directory(app.config["BENCH_IMAGE_FOLDER"], filename)
 
     @app.get("/benches/<bench_id>/adopt")
     def adoption_form(bench_id: str):

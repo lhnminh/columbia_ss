@@ -37,6 +37,27 @@ class AppTests(unittest.TestCase):
         available = self.client.get("/benches/Bench31")
         self.assertIn(b"Adopt this bench", available.data)
 
+    def test_bench_detail_uses_a_random_image_from_img_folder(self) -> None:
+        image_name = "wood-plastic-composite-benches.jpg.webp"
+
+        with patch("columbia_ss.app.random.choice", return_value=image_name) as choice:
+            response = self.client.get("/benches/Bench31")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b'src="/bench-images/wood-plastic-composite-benches.jpg.webp"',
+            response.data,
+        )
+        location = self.storage.benches["Bench31"]["location"].encode()
+        self.assertIn(b'alt="Bench at ' + location + b'"', response.data)
+        self.assertEqual(choice.call_count, 1)
+        self.assertIn(image_name, choice.call_args.args[0])
+
+        image = self.client.get(f"/bench-images/{image_name}")
+        self.assertEqual(image.status_code, 200)
+        self.assertEqual(image.mimetype, "image/webp")
+        image.close()
+
     def test_directory_leads_with_summary_and_availability_map(self) -> None:
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -131,6 +152,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"applyFilter", script.data)
         self.assertIn(b"scrollWheelZoom: true", script.data)
         self.assertIn(b"frame.scrollLeft", script.data)
+        self.assertIn(b"ADOPTED UNTIL ${bench.adoption_end_date}", script.data)
+        self.assertNotIn(b"ADOPTED OR RESERVED", script.data)
         script.close()
 
     def test_sticky_bench_labels_cover_the_today_line(self) -> None:
@@ -155,6 +178,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.data.count(b'data-list-status="'), 550)
         self.assertIn(b'"latitude": 40.', response.data)
         self.assertIn(b'"longitude": -73.', response.data)
+        self.assertIn(
+            f'"adoption_end_date": "{self.storage.benches["Bench1"]["end_date"]}"'.encode(),
+            response.data,
+        )
         self.assertEqual(list_benches.call_count, 1)
 
     def test_review_then_confirm(self) -> None:

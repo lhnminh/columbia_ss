@@ -91,7 +91,9 @@
 
       const eyebrow = document.createElement("p");
       eyebrow.className = "eyebrow";
-      eyebrow.textContent = bench.available ? "AVAILABLE NOW" : "ADOPTED OR RESERVED";
+      eyebrow.textContent = bench.available
+        ? "AVAILABLE NOW"
+        : `ADOPTED UNTIL ${bench.adoption_end_date}`;
       const heading = document.createElement("h3");
       heading.textContent = bench.id;
       const location = document.createElement("p");

@@ -8,36 +8,39 @@ from random import Random
 from columbia_ss.domain import (
     BenchUnavailable,
     BookingError,
-    generate_seed_adoption_timelines,
+    generate_initial_adoption_timelines,
     park_today,
     validate_booking,
 )
+from columbia_ss.locations import generated_bench_coordinates
 
 
 class FakeStorage:
     """Implement the Postgres module's interface without testing persistence."""
 
     def __init__(self) -> None:
-        self.benches = {
-            f"Bench{number}": {
+        self.benches = {}
+        for number in range(1, 551):
+            latitude, longitude = generated_bench_coordinates(number)
+            self.benches[f"Bench{number}"] = {
                 "id": f"Bench{number}",
                 "location": (
-                    f"Demo Zone {(number - 1) // 50 + 1} · Spot {(number - 1) % 50 + 1}"
+                    f"Park Area {(number - 1) // 50 + 1} · Site {(number - 1) % 50 + 1}"
                 ),
+                "latitude": latitude,
+                "longitude": longitude,
                 "adoption_id": None,
                 "start_date": None,
                 "end_date": None,
                 "public_name": None,
             }
-            for number in range(1, 551)
-        }
         self.adoptions: dict[int, dict] = {}
         today = park_today()
-        for number, start, end in generate_seed_adoption_timelines(
+        for number, start, end in generate_initial_adoption_timelines(
             today=today, randomizer=Random(2026)
         ):
             self._store_adoption(
-                bench_id=f"Bench{number}", public_name=f"Demo Donor {number}",
+                bench_id=f"Bench{number}", public_name="Anonymous Park Supporter",
                 start_date=start.isoformat(), end_date=end.isoformat(), amount_cents=10000,
             )
 
@@ -81,6 +84,16 @@ class FakeStorage:
     ) -> dict | None:
         matches = self.list_benches(self, search=bench_id, today=today)
         return matches[0] if matches else None
+
+    def list_adoptions_in_range(
+        self, _connection: FakeStorage, *, start_date: date, end_date: date,
+    ) -> list[dict]:
+        return [
+            dict(adoption)
+            for adoption in self.adoptions.values()
+            if date.fromisoformat(adoption["start_date"]) <= end_date
+            and date.fromisoformat(adoption["end_date"]) >= start_date
+        ]
 
     def create_adoption(
         self, _connection: FakeStorage, bench_id: str, public_name: str,

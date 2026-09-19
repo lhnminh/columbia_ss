@@ -1,4 +1,4 @@
-"""Flask pages for browsing and adopting fictional park benches."""
+"""Flask pages for browsing and adopting park benches."""
 
 from __future__ import annotations
 
@@ -7,10 +7,13 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from flask import Flask, abort, g, redirect, render_template, request, url_for
 
 from . import postgres
 from .domain import BenchUnavailable, BookingError, park_today, validate_booking
+
+load_dotenv()
 
 
 def _as_date(value: date | str) -> date:
@@ -18,27 +21,36 @@ def _as_date(value: date | str) -> date:
     return value if isinstance(value, date) else date.fromisoformat(value)
 
 
-def _availability_overview(benches, *, today: date) -> tuple[dict | None, list[dict]]:
-    """Build the next-available highlight and 90-day availability map."""
-    horizon_days = 90
+def _availability_overview(
+    benches, adoptions, *, today: date,
+) -> tuple[dict | None, list[dict]]:
+    """Build the next-available highlight and adoption timeline."""
+    history_days = 60
+    future_days = 90
+    window_start = today - timedelta(days=history_days)
+    window_end = today + timedelta(days=future_days)
+    window_days = (window_end - window_start).days
     next_available = next(
         (bench for bench in benches if bench["adoption_id"] is None), None
     )
 
     map_rows = []
-    for bench in benches:
-        bar = None
-        if bench["adoption_id"] is not None:
-            start = max(_as_date(bench["start_date"]), today)
-            end = min(_as_date(bench["end_date"]), today + timedelta(days=horizon_days))
-            if start <= end:
-                bar = {
-                    "left": max(0, (start - today).days) / horizon_days * 100,
-                    "width": max(1.5, (end - start).days / horizon_days * 100),
-                    "start_date": _as_date(bench["start_date"]),
-                    "end_date": _as_date(bench["end_date"]),
+    bars_by_bench: dict[str, list[dict]] = {}
+    for adoption in adoptions:
+        start = max(_as_date(adoption["start_date"]), window_start)
+        end = min(_as_date(adoption["end_date"]), window_end)
+        if start <= end:
+            bars_by_bench.setdefault(adoption["bench_id"], []).append(
+                {
+                    "left": (start - window_start).days / window_days * 100,
+                    "width": max(0.75, (end - start).days / window_days * 100),
+                    "start_date": _as_date(adoption["start_date"]),
+                    "end_date": _as_date(adoption["end_date"]),
                 }
-        map_rows.append({"bench": bench, "bar": bar})
+            )
+
+    for bench in benches:
+        map_rows.append({"bench": bench, "bars": bars_by_bench.get(bench["id"], [])})
     return next_available, map_rows
 
 
@@ -75,36 +87,55 @@ def create_app(
 
     @app.get("/")
     def directory():
-        search = request.args.get("q", "").strip()[:100]
-        status = request.args.get("status", "")
-        if status not in ("", "available", "adopted"):
-            status = ""
-        all_benches = storage.list_benches(db(), search=search, status=status)
-        try:
-            page = max(1, int(request.args.get("page", "1")))
-        except ValueError:
-            page = 1
-        page_size = 24
-        pages = max(1, (len(all_benches) + page_size - 1) // page_size)
-        page = min(page, pages)
-        benches = all_benches[(page - 1) * page_size : page * page_size]
-        counts = storage.list_benches(db())
-        adopted_count = sum(bench["adoption_id"] is not None for bench in counts)
+        map_status = request.args.get("status", "")
+        if map_status not in ("available", "adopted"):
+            map_status = "all"
+        benches = storage.list_benches(db())
+        adopted_count = sum(bench["adoption_id"] is not None for bench in benches)
         today = park_today()
-        next_available, availability_rows = _availability_overview(counts, today=today)
+        map_start = today - timedelta(days=60)
+        map_end = today + timedelta(days=90)
+        timeline_adoptions = storage.list_adoptions_in_range(
+            db(), start_date=map_start, end_date=map_end
+        )
+        next_available, availability_rows = _availability_overview(
+            benches, timeline_adoptions, today=today
+        )
+        map_benches = [
+            {
+                "id": bench["id"],
+                "location": bench["location"],
+                "latitude": bench["latitude"],
+                "longitude": bench["longitude"],
+                "available": bench["adoption_id"] is None,
+                "detail_url": url_for("bench_detail", bench_id=bench["id"]),
+                "action_url": url_for(
+                    "adoption_form" if bench["adoption_id"] is None else "bench_detail",
+                    bench_id=bench["id"],
+                ),
+                "action_label": (
+                    "Adopt this bench" if bench["adoption_id"] is None else "View bench"
+                ),
+            }
+            for bench in benches
+        ]
         return render_template(
             "directory.html",
-            benches=benches,
-            search=search,
-            status=status,
-            page=page,
-            pages=pages,
-            total=len(all_benches),
-            bench_count=len(counts),
+            bench_count=len(benches),
             adopted_count=adopted_count,
             next_available=next_available,
             availability_rows=availability_rows,
-            map_dates=[today + timedelta(days=offset) for offset in (0, 30, 60, 90)],
+            map_benches=map_benches,
+            map_status=map_status,
+            map_dates=[
+                {
+                    "date": map_start + timedelta(days=offset),
+                    "left": offset / 150 * 100,
+                }
+                for offset in (0, 30, 90, 120, 150)
+            ],
+            map_today=today,
+            today_position=40,
         )
 
     @app.get("/benches/<bench_id>")

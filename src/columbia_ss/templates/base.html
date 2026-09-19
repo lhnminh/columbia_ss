@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Explore and adopt a bench in the Van Cortlandt Park demo.">
-  <title>{% block title %}Bench by Bench{% endblock %} · Van Cortlandt Park Demo</title>
+  <meta name="description" content="Explore and adopt a bench in Van Cortlandt Park.">
+  <title>{% block title %}Bench by Bench{% endblock %} · Van Cortlandt Park</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -13,7 +14,7 @@
     <div class="shell header-inner">
       <a class="brand" href="{{ url_for('directory') }}" aria-label="Bench by Bench home">
         <span class="brand-mark" aria-hidden="true">⌁</span>
-        <span><strong>Bench by Bench</strong><small>VAN CORTLANDT PARK · DEMO</small></span>
+        <span><strong>Bench by Bench</strong><small>VAN CORTLANDT PARK</small></span>
       </a>
       <nav aria-label="Main navigation"><a href="{{ url_for('directory') }}">Explore benches <span aria-hidden="true">↗</span></a></nav>
     </div>
@@ -21,7 +22,7 @@
   <main id="main">{% block content %}{% endblock %}</main>
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <span>Bench by Bench <span aria-hidden="true">·</span> A fictional adoption demo</span>
+      <span>Bench by Bench <span aria-hidden="true">·</span> Van Cortlandt Park</span>
       <span>No payment is collected on this site.</span>
     </div>
   </footer>

@@ -9,7 +9,7 @@
   <div class="review-panel"><div class="review-head"><span class="eyebrow">YOUR BENCH</span><strong>{{ bench.id }}</strong><small>{{ bench.location }}</small></div>
     <dl class="detail-list"><div><dt>Public name</dt><dd>{{ public_name }}</dd></div><div><dt>Start date</dt><dd>{{ start_date }}</dd></div><div><dt>End date</dt><dd>{{ end_date }}</dd></div><div><dt>Recorded amount</dt><dd>{{ money(amount_cents) }}</dd></div></dl>
   </div>
-  <p class="notice">This is a demo booking. No payment is collected or processed.</p>
+  <p class="notice">No online payment is collected or processed during this request.</p>
   <form method="post" action="{{ url_for('confirm_adoption', bench_id=bench.id) }}">
     <input type="hidden" name="public_name" value="{{ public_name }}"><input type="hidden" name="start_date" value="{{ start_date }}"><input type="hidden" name="end_date" value="{{ end_date }}"><input type="hidden" name="amount" value="{{ amount }}">
     <button class="button button-dark wide" type="submit">Confirm adoption <span aria-hidden="true">→</span></button>

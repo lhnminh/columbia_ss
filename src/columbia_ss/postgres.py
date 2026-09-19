@@ -1,4 +1,4 @@
-"""Postgres persistence for the hosted bench demo."""
+"""Postgres persistence for the bench adoption service."""
 
 from __future__ import annotations
 
@@ -26,15 +26,15 @@ def list_benches(
     current_date = today or park_today()
     search = search.strip()
     pattern = f"%{search}%"
-    zone = re.fullmatch(r"Demo Zone (\d+)", search, re.IGNORECASE)
-    location_pattern = f"Demo Zone {int(zone.group(1))} · %" if zone else pattern
+    zone = re.fullmatch(r"Park Area (\d+)", search, re.IGNORECASE)
+    location_pattern = f"Park Area {int(zone.group(1))} · %" if zone else pattern
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1 FROM benches WHERE lower(id) = lower(%s)", (search,))
         exact_id = cursor.fetchone() is not None
         cursor.execute(
             """
-            SELECT b.id, b.location, a.id AS adoption_id, a.start_date, a.end_date,
-                   p.public_name
+            SELECT b.id, b.location, b.latitude, b.longitude,
+                   a.id AS adoption_id, a.start_date, a.end_date, p.public_name
             FROM benches b
             LEFT JOIN LATERAL (
                 SELECT id, adopter_id, start_date, end_date FROM adoptions
@@ -53,6 +53,24 @@ def list_benches(
         return cursor.fetchall()
 
 
+def list_adoptions_in_range(
+    connection: Connection[dict[str, Any]], *, start_date: date, end_date: date,
+) -> list[dict[str, Any]]:
+    """Return every adoption that overlaps the requested chart window."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT a.bench_id, a.start_date, a.end_date, p.public_name
+            FROM adoptions a
+            JOIN adopters p ON p.id = a.adopter_id
+            WHERE a.start_date <= %s AND a.end_date >= %s
+            ORDER BY CAST(SUBSTRING(a.bench_id FROM 6) AS INTEGER), a.start_date
+            """,
+            (end_date, start_date),
+        )
+        return cursor.fetchall()
+
+
 def get_bench(
     connection: Connection[dict[str, Any]], bench_id: str, *, today: date | None = None,
 ) -> dict[str, Any] | None:
@@ -60,8 +78,8 @@ def get_bench(
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT b.id, b.location, a.id AS adoption_id, a.start_date, a.end_date,
-                   p.public_name
+            SELECT b.id, b.location, b.latitude, b.longitude,
+                   a.id AS adoption_id, a.start_date, a.end_date, p.public_name
             FROM benches b
             LEFT JOIN LATERAL (
                 SELECT id, adopter_id, start_date, end_date FROM adoptions

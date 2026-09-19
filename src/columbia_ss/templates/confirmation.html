@@ -9,7 +9,7 @@
   <div class="review-panel"><div class="review-head"><span class="eyebrow">YOUR ADOPTION</span><strong>{{ adoption.bench_id }}</strong><small>{{ adoption.location }}</small></div>
     <dl class="detail-list"><div><dt>Public name</dt><dd>{{ adoption.public_name }}</dd></div><div><dt>Start date</dt><dd>{{ adoption.start_date }}</dd></div><div><dt>End date</dt><dd>{{ adoption.end_date }}</dd></div><div><dt>Recorded amount</dt><dd>{{ money(adoption.amount_cents) }}</dd></div></dl>
   </div>
-  <p class="notice"><strong>No payment was taken.</strong> This is a demonstration booking only.</p>
+  <p class="notice"><strong>Your adoption has been recorded.</strong> No online payment was taken.</p>
   <a class="button button-dark wide" href="{{ url_for('bench_detail', bench_id=adoption.bench_id) }}">View your bench <span aria-hidden="true">→</span></a>
 </section>
 {% endblock %}

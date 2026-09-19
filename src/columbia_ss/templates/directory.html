@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Explore benches{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+{% endblock %}
 {% block content %}
 <section class="home-overview">
   <div class="shell overview-grid">
     <div class="overview-copy">
       <p class="eyebrow light">A PLACE TO PAUSE</p>
-      <h1>Find a bench <em>without the wait.</em></h1>
-      <p>See what is open now and when each fictional bench becomes available.</p>
+      <h1>Adopt a bench <em>today.</em></h1>
+      <p>Explore current availability and choose a place to support in Van Cortlandt Park.</p>
       <div class="summary-counts" aria-label="Bench collection summary">
         <div><strong>{{ adopted_count }}</strong><span>adopted or reserved</span></div>
         <div><strong>{{ bench_count - adopted_count }}</strong><span>available now</span></div>
@@ -23,30 +28,65 @@
       <h2>All benches are reserved</h2>
       <p>Check the availability map for upcoming openings.</p>
       {% endif %}
-      <a class="available-link" href="{{ url_for('directory', status='available') }}#browse">Browse benches available now →</a>
+      <a class="available-link" href="{{ url_for('directory', status='available') }}#bench-map">Browse benches available now →</a>
     </aside>
   </div>
 </section>
+<section class="bench-map-section shell" id="bench-map" aria-labelledby="bench-map-title" data-initial-status="{{ map_status }}">
+  <div class="section-heading bench-map-heading">
+    <div><p class="eyebrow">THE COLLECTION</p><h2 id="bench-map-title">Explore the park.</h2></div>
+    <p>See every bench across Van Cortlandt Park and filter by current availability.</p>
+  </div>
+  <div class="prototype-notice" role="note">
+    <strong>Prototype locations</strong>
+    <span>Bench positions are generated for planning purposes and do not represent surveyed locations.</span>
+  </div>
+  <div class="map-toolbar">
+    <div class="map-filters" role="group" aria-label="Filter map by bench status">
+      <button type="button" data-map-filter="all">All benches</button>
+      <button type="button" data-map-filter="available">Available</button>
+      <button type="button" data-map-filter="adopted">Adopted</button>
+    </div>
+    <p class="map-result-count" aria-live="polite"><strong id="map-result-count">{{ bench_count }}</strong> <span id="map-result-label">benches shown</span></p>
+  </div>
+  <div class="geographic-map-layout">
+    <div id="geographic-map" class="geographic-map" aria-label="Interactive map of prototype bench locations"></div>
+    <aside class="map-selection" id="map-selection" aria-live="polite">
+      <p class="eyebrow">SELECT A BENCH</p>
+      <h3>Choose a marker</h3>
+      <p>Select any marker to see its status and open the bench details.</p>
+    </aside>
+  </div>
+  <details class="accessible-bench-list">
+    <summary>Browse the visible benches as a list</summary>
+    <ul id="accessible-bench-results">
+      {% for bench in map_benches %}
+      <li data-list-status="{{ 'available' if bench.available else 'adopted' }}"><a href="{{ bench.detail_url }}"><strong>{{ bench.id }}</strong><span>{{ bench.location }}</span><span>{{ 'Available' if bench.available else 'Adopted' }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
 <section class="availability shell" aria-labelledby="availability-title">
   <div class="availability-heading">
-    <div><p class="eyebrow">90-DAY AVAILABILITY</p><h2 id="availability-title">Bench map</h2></div>
+    <div><p class="eyebrow">60-DAY HISTORY · 90-DAY OUTLOOK</p><h2 id="availability-title">Availability timeline</h2></div>
     <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted or reserved</span><span><i class="legend-open"></i>Available</span></div>
   </div>
-  <p class="availability-help">Scroll down to explore every bench. Select a bench name to see its details.</p>
+  <p class="availability-help">Scroll left to review the last 60 days, right for upcoming availability, and down to explore every bench.</p>
   <div class="map-frame" tabindex="0" aria-label="Scrollable bench availability map">
-    <div class="gantt-map">
+    <div class="gantt-map" style="--today-left: {{ today_position }}%">
       <div class="gantt-axis">
         <span>Bench</span>
         <div class="date-axis">
-          {% for map_date in map_dates %}<time datetime="{{ map_date.isoformat() }}">{{ map_date.strftime('%b %-d') }}</time>{% endfor %}
+          {% for marker in map_dates %}<time class="{{ 'axis-end' if loop.last else '' }}" style="--date-left: {{ '%.3f'|format(marker.left) }}%" datetime="{{ marker.date.isoformat() }}"><span>{{ marker.date.strftime('%b %-d') }}</span></time>{% endfor %}
+          <time class="today-date" style="--date-left: {{ today_position }}%" datetime="{{ map_today.isoformat() }}"><strong>Today</strong><span>{{ map_today.strftime('%b %-d') }}</span></time>
         </div>
       </div>
       <div class="gantt-rows">
         {% for row in availability_rows %}
         <div class="gantt-row">
           <a class="gantt-label" href="{{ url_for('bench_detail', bench_id=row.bench.id) }}"><strong>{{ row.bench.id }}</strong><span>{{ row.bench.location }}</span></a>
-          <div class="gantt-track">
-            {% if row.bar %}<span class="reservation-bar" style="--bar-left: {{ '%.3f'|format(row.bar.left) }}%; --bar-width: {{ '%.3f'|format(row.bar.width) }}%" title="Reserved {{ row.bar.start_date }} through {{ row.bar.end_date }}"><span class="sr-only">Reserved {{ row.bar.start_date }} through {{ row.bar.end_date }}</span></span>{% else %}<span class="sr-only">Available throughout the displayed period</span>{% endif %}
+          <div class="gantt-track"><span class="today-line" aria-hidden="true"></span>
+            {% for bar in row.bars %}<span class="reservation-bar" style="--bar-left: {{ '%.3f'|format(bar.left) }}%; --bar-width: {{ '%.3f'|format(bar.width) }}%" title="Reserved {{ bar.start_date }} through {{ bar.end_date }}"><span class="sr-only">Reserved {{ bar.start_date }} through {{ bar.end_date }}</span></span>{% else %}<span class="sr-only">Available throughout the displayed period</span>{% endfor %}
           </div>
         </div>
         {% endfor %}
@@ -54,37 +94,8 @@
     </div>
   </div>
 </section>
-<section class="browse shell" id="browse">
-  <div class="section-heading"><div><p class="eyebrow">THE COLLECTION</p><h2>Find your bench.</h2></div><p>Every bench here is sample data for this demo.</p></div>
-  <form class="search-bar" method="get" action="{{ url_for('directory') }}#browse" role="search">
-    <label for="q">Search by bench or demo location</label>
-    <div class="search-controls"><input id="q" name="q" type="search" placeholder="Try Bench42 or Demo Zone 3" value="{{ search }}"><button class="button button-dark" type="submit">Search <span aria-hidden="true">→</span></button></div>
-  </form>
-  <div class="browse-toolbar">
-    <div class="tabs" aria-label="Filter by status">
-      <a class="{{ 'selected' if status == '' else '' }}" href="{{ url_for('directory', q=search) }}#browse" {% if status == '' %}aria-current="page"{% endif %}>All benches</a>
-      <a class="{{ 'selected' if status == 'available' else '' }}" href="{{ url_for('directory', q=search, status='available') }}#browse" {% if status == 'available' %}aria-current="page"{% endif %}>Available</a>
-      <a class="{{ 'selected' if status == 'adopted' else '' }}" href="{{ url_for('directory', q=search, status='adopted') }}#browse" {% if status == 'adopted' %}aria-current="page"{% endif %}>Adopted</a>
-    </div>
-    <p>{{ total }} {{ 'bench' if total == 1 else 'benches' }} found</p>
-  </div>
-  {% if benches %}
-  <div class="bench-grid">
-    {% for bench in benches %}
-    <a class="bench-card" href="{{ url_for('bench_detail', bench_id=bench.id) }}">
-      <div class="card-top"><span class="bench-number">{{ bench.id }}</span><span class="status {{ 'status-adopted' if bench.adoption_id else 'status-available' }}">{{ 'Adopted' if bench.adoption_id else 'Available' }}</span></div>
-      <div class="card-icon" aria-hidden="true">▰</div>
-      <p class="card-location">{{ bench.location }}</p>
-      <div class="card-bottom"><span>{{ bench.public_name if bench.adoption_id else 'Ready for a new story' }}</span><span aria-hidden="true">↗</span></div>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}<div class="empty-state"><h3>No benches found</h3><p>Try a different bench number, location, or status.</p><a href="{{ url_for('directory') }}#browse">Clear filters</a></div>{% endif %}
-  {% if pages > 1 %}<nav class="pagination" aria-label="Result pages">
-    {% if page > 1 %}<a href="{{ url_for('directory', q=search, status=status, page=page-1) }}#browse">← Previous</a>{% endif %}
-    <span>Page {{ page }} of {{ pages }}</span>
-    {% if page < pages %}<a href="{{ url_for('directory', q=search, status=status, page=page+1) }}#browse">Next →</a>{% endif %}
-  </nav>{% endif %}
-</section>
+<script id="bench-map-data" type="application/json">{{ map_benches|tojson }}</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
 <script src="{{ url_for('static', filename='directory.js') }}" defer></script>
 {% endblock %}

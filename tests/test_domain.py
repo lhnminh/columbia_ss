@@ -6,7 +6,7 @@ from random import Random
 
 from columbia_ss.domain import (
     BookingError,
-    generate_seed_adoption_timelines,
+    generate_initial_adoption_timelines,
     park_today,
     validate_booking,
 )
@@ -19,7 +19,7 @@ class DomainTests(unittest.TestCase):
         self.end = (self.today + timedelta(days=30)).isoformat()
 
     def test_seeded_adoption_timelines_are_varied(self) -> None:
-        timelines = generate_seed_adoption_timelines(
+        timelines = generate_initial_adoption_timelines(
             today=self.today, randomizer=Random(2026)
         )
         starts = [start for _, start, _ in timelines]

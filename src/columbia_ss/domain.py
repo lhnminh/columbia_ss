@@ -1,4 +1,4 @@
-"""Shared booking rules for the bench adoption demo."""
+"""Shared rules for the bench adoption service."""
 
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ def park_today() -> date:
     return datetime.now(PARK_TIME_ZONE).date()
 
 
-def generate_seed_adoption_timelines(
+def generate_initial_adoption_timelines(
     *, today: date, randomizer: Random | None = None,
 ) -> list[tuple[int, date, date]]:
-    """Create varied active and future timelines for the 30 sample adoptions."""
+    """Create varied active and future timelines for the 30 initial adoptions."""
     generator = randomizer or Random()
     adoption_states = ["active"] * 20 + ["future"] * 10
     generator.shuffle(adoption_states)

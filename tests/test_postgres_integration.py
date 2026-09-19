@@ -44,10 +44,13 @@ class PostgresIntegrationTests(unittest.TestCase):
 
     def test_seed_browse_and_exact_amount(self) -> None:
         self.assertEqual(len(postgres.list_benches(self.connection)), 550)
-        self.assertEqual(len(postgres.list_benches(self.connection, search="Demo Zone 1")), 50)
+        self.assertEqual(len(postgres.list_benches(self.connection, search="Park Area 1")), 50)
         self.assertEqual(len(postgres.list_benches(self.connection, search="bench31")), 1)
         self.assertEqual(len(postgres.list_benches(self.connection, search="Bench_")), 550)
-        self.assertIsNotNone(postgres.get_bench(self.connection, "Bench1")["adoption_id"])
+        bench_one = postgres.get_bench(self.connection, "Bench1")
+        self.assertIsNotNone(bench_one["adoption_id"])
+        self.assertIsInstance(bench_one["latitude"], float)
+        self.assertIsInstance(bench_one["longitude"], float)
         today = park_today()
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT start_date, end_date FROM adoptions")
@@ -85,6 +88,32 @@ class PostgresIntegrationTests(unittest.TestCase):
         admin.reset(self.connection)
         self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 30)
         self.assertIsNone(postgres.get_bench(self.connection, "Bench31")["adoption_id"])
+
+    def test_refresh_timelines_preserves_visitor_booking(self) -> None:
+        today = park_today()
+        adoption_id = postgres.create_adoption(
+            self.connection, "Bench31", "Visitor", today.isoformat(),
+            (today + timedelta(days=10)).isoformat(), "75.25",
+        )
+        visitor_before = postgres.get_adoption(self.connection, adoption_id)
+
+        self.assertEqual(
+            admin.refresh_timelines(self.connection, randomizer=Random(2027)), 30
+        )
+
+        visitor_after = postgres.get_adoption(self.connection, adoption_id)
+        self.assertEqual(visitor_after, visitor_before)
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT a.start_date, a.end_date
+                   FROM adoptions a
+                   JOIN adopters p ON p.id = a.adopter_id
+                   WHERE p.public_name = 'Anonymous Park Supporter'"""
+            )
+            timelines = cursor.fetchall()
+        self.assertEqual(
+            len({(row["start_date"], row["end_date"]) for row in timelines}), 30
+        )
 
 
 if __name__ == "__main__":

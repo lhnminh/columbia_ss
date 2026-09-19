@@ -4,12 +4,13 @@ import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from random import Random
 from uuid import uuid4
 
 from psycopg import sql
 
 from columbia_ss import admin, postgres
-from columbia_ss.database import BenchUnavailable, park_today
+from columbia_ss.domain import BenchUnavailable, park_today
 
 
 @unittest.skipUnless(os.environ.get("TEST_DATABASE_URL"), "TEST_DATABASE_URL is not set")
@@ -39,7 +40,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         return connection
 
     def setUp(self) -> None:
-        admin.reset(self.connection)
+        admin.reset(self.connection, randomizer=Random(2026))
 
     def test_seed_browse_and_exact_amount(self) -> None:
         self.assertEqual(len(postgres.list_benches(self.connection)), 550)
@@ -48,6 +49,14 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(len(postgres.list_benches(self.connection, search="Bench_")), 550)
         self.assertIsNotNone(postgres.get_bench(self.connection, "Bench1")["adoption_id"])
         today = park_today()
+        with self.connection.cursor() as cursor:
+            cursor.execute("SELECT start_date, end_date FROM adoptions")
+            timelines = cursor.fetchall()
+        self.assertEqual(sum(row["start_date"] <= today for row in timelines), 20)
+        self.assertEqual(sum(row["start_date"] > today for row in timelines), 10)
+        self.assertEqual(
+            len({(row["start_date"], row["end_date"]) for row in timelines}), 30
+        )
         adoption_id = postgres.create_adoption(
             self.connection, "Bench31", "Alex", today.isoformat(),
             (today + timedelta(days=10)).isoformat(), "75.25",

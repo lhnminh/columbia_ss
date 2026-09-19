@@ -5,15 +5,16 @@ from __future__ import annotations
 import os
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from flask import Flask, abort, g, redirect, render_template, request, url_for
 
-from . import database, postgres
-from .database import BenchUnavailable, BookingError, park_today, validate_booking
+from . import postgres
+from .domain import BenchUnavailable, BookingError, park_today, validate_booking
 
 
 def _as_date(value: date | str) -> date:
-    """Normalize dates returned by SQLite and Postgres."""
+    """Normalize dates returned by storage backends and test doubles."""
     return value if isinstance(value, date) else date.fromisoformat(value)
 
 
@@ -41,23 +42,20 @@ def _availability_overview(benches, *, today: date) -> tuple[dict | None, list[d
     return next_available, map_rows
 
 
-def create_app(database_path: str | Path | None = None) -> Flask:
-    """Construct the app, using Postgres when DATABASE_URL is configured."""
+def create_app(
+    database_url: str | None = None, *, storage_backend: Any = postgres,
+) -> Flask:
+    """Construct the Postgres-backed application."""
     static_folder = Path(__file__).resolve().parents[2] / "public" / "static"
     app = Flask(__name__, static_folder=str(static_folder), static_url_path="/static")
-    app.config["DATABASE_URL"] = None if database_path else os.environ.get("DATABASE_URL")
-    app.config["DATABASE"] = str(
-        database_path or os.environ.get("COLUMBIA_SS_DB") or Path.cwd() / "instance" / "benches.sqlite3"
-    )
-    if os.environ.get("VERCEL") and not app.config["DATABASE_URL"]:
-        raise RuntimeError("DATABASE_URL is required on Vercel; refusing to use local SQLite")
-    storage = postgres if app.config["DATABASE_URL"] else database
-    if storage is database:
-        database.initialize_database(app.config["DATABASE"])
+    app.config["DATABASE_URL"] = database_url or os.environ.get("DATABASE_URL")
+    if not app.config["DATABASE_URL"]:
+        raise RuntimeError("DATABASE_URL is required")
+    storage = storage_backend
 
     def db():
         if "database" not in g:
-            g.database = storage.connect(app.config["DATABASE_URL"] or app.config["DATABASE"])
+            g.database = storage.connect(app.config["DATABASE_URL"])
         return g.database
 
     @app.teardown_appcontext

@@ -8,12 +8,11 @@ Use Python 3.13 (the version in `.python-version`):
 
 ```sh
 uv sync
+export DATABASE_URL='postgresql://...'
 uv run columbia-ss
 ```
 
-Open <http://127.0.0.1:5000>. The app creates `instance/benches.sqlite3` on first run and seeds Bench1 through Bench550. Bench1–Bench30 have fictional sample adoptions; Bench31 is available for trying the booking flow. The local database persists bookings between restarts. To start over, remove only `instance/benches.sqlite3` while the server is stopped, then run the app again.
-
-Set `COLUMBIA_SS_DB` to an alternate SQLite file path if you want to keep a separate demo database.
+Open <http://127.0.0.1:5000>. Local development and Vercel both require Postgres through `DATABASE_URL`, so they exercise the same persistence code. Run the migration and seed commands below before the first local run. Bench1–Bench30 receive varied active and future sample timelines; Bench31 is available for trying the booking flow.
 
 ## Test
 
@@ -27,7 +26,7 @@ uv run python -m unittest discover -s tests -v
 - The end date is inclusive. The bench becomes available the next day.
 - A future-dated booking reserves the bench immediately. The directory labels it **Adopted** and displays its dates.
 - The amount is stored exactly as integer cents; it is not a payment. A public name is stored for each booking, without contact details or accounts.
-- A booking is committed in one SQLite write transaction so a competing submission cannot also reserve the same bench.
+- A booking is committed in one Postgres transaction with a bench-row lock, so a competing submission cannot also reserve the same bench.
 - Public bookings must end within 90 days of the current New York date.
 
 The app uses three tables: `benches`, `adopters`, and `adoptions`. This is a demo, not a real park inventory or payment service.
@@ -36,7 +35,7 @@ The app uses three tables: `benches`, `adopters`, and `adoptions`. This is a dem
 
 The public demo is available at <https://columbia-ss.vercel.app/>.
 
-The root `app.py` exports the Flask application for Vercel. Select the `columbia-ss` database in the Neon project, then set `DATABASE_URL` to its **pooled** Postgres connection string in both the Preview and Production Vercel environments. **Use the same database URL in both environments**: bookings and resets are shared. The app refuses to start on Vercel without `DATABASE_URL`, rather than writing to temporary SQLite storage. Keep the URL out of Git.
+The root `app.py` exports the Flask application for Vercel. Select the `columbia-ss` database in the Neon project, then set `DATABASE_URL` to its **pooled** Postgres connection string locally and in both the Preview and Production Vercel environments. **Use the same database URL in both Vercel environments**: bookings and resets are shared. The app refuses to start anywhere without `DATABASE_URL`. Keep the URL out of Git.
 
 After creating the Neon database, run these commands from the repository root with `DATABASE_URL` set in your shell:
 

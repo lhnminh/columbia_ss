@@ -10,7 +10,7 @@ import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
 
-from .database import BenchUnavailable, BookingError, park_today, validate_booking
+from .domain import BenchUnavailable, BookingError, park_today, validate_booking
 
 
 def connect(database_url: str) -> Connection[dict[str, Any]]:

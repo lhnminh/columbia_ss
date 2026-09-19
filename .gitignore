@@ -12,5 +12,5 @@ wheels/
 # Local contributor instructions
 /AGENTS.md
 
-# Local demo database
+# Legacy local runtime data; the application no longer reads it
 instance/

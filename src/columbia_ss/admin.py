@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import timedelta
+from random import Random
 from typing import Any
 
 from psycopg import Connection, Cursor
 
-from .database import park_today
+from .domain import generate_seed_adoption_timelines, park_today
 from .postgres import connect
 
 
@@ -45,7 +45,9 @@ def migrate(connection: Connection[dict[str, Any]]) -> None:
                     cursor.execute(statement)
 
 
-def _seed_in_transaction(cursor: Cursor[dict[str, Any]]) -> None:
+def _seed_in_transaction(
+    cursor: Cursor[dict[str, Any]], *, randomizer: Random | None = None,
+) -> None:
     cursor.execute("SELECT COUNT(*) AS count FROM benches")
     if cursor.fetchone()["count"]:
         return
@@ -55,14 +57,14 @@ def _seed_in_transaction(cursor: Cursor[dict[str, Any]]) -> None:
     ]
     cursor.executemany("INSERT INTO benches (id, location) VALUES (%s, %s)", benches)
     today = park_today()
-    for number in range(1, 31):
+    for number, start, end in generate_seed_adoption_timelines(
+        today=today, randomizer=randomizer
+    ):
         cursor.execute(
             "INSERT INTO adopters (public_name) VALUES (%s) RETURNING id",
             (f"Demo Donor {number}",),
         )
         adopter_id = cursor.fetchone()["id"]
-        start = today - timedelta(days=30) if number <= 20 else today + timedelta(days=10)
-        end = today + timedelta(days=60) if number <= 20 else today + timedelta(days=100)
         cursor.execute(
             """INSERT INTO adoptions
                (bench_id, adopter_id, start_date, end_date, amount_cents)
@@ -71,15 +73,19 @@ def _seed_in_transaction(cursor: Cursor[dict[str, Any]]) -> None:
         )
 
 
-def seed(connection: Connection[dict[str, Any]]) -> None:
+def seed(
+    connection: Connection[dict[str, Any]], *, randomizer: Random | None = None,
+) -> None:
     """Add the fictional inventory once; repeat calls do nothing."""
     with connection.transaction():
         with connection.cursor() as cursor:
             cursor.execute("LOCK TABLE benches IN ACCESS EXCLUSIVE MODE")
-            _seed_in_transaction(cursor)
+            _seed_in_transaction(cursor, randomizer=randomizer)
 
 
-def reset(connection: Connection[dict[str, Any]]) -> None:
+def reset(
+    connection: Connection[dict[str, Any]], *, randomizer: Random | None = None,
+) -> None:
     """Erase demo bookings and restore the fictional starting state atomically."""
     with connection.transaction():
         with connection.cursor() as cursor:
@@ -87,7 +93,7 @@ def reset(connection: Connection[dict[str, Any]]) -> None:
             cursor.execute("DELETE FROM adoptions")
             cursor.execute("DELETE FROM adopters")
             cursor.execute("DELETE FROM benches")
-            _seed_in_transaction(cursor)
+            _seed_in_transaction(cursor, randomizer=randomizer)
 
 
 def main() -> None:

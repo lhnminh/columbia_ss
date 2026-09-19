@@ -9,6 +9,7 @@
 <section class="home-overview">
   <div class="shell overview-grid">
     <div class="overview-copy">
+      <p class="eyebrow">VAN CORTLANDT PARK · THE BRONX</p>
       <h1>Adopt a bench <em>today.</em></h1>
       <p>Explore current availability and choose a place to support in Van Cortlandt Park.</p>
       <div class="summary-counts" aria-label="Bench collection summary">
@@ -16,24 +17,28 @@
         <div><strong>{{ bench_count - adopted_count }}</strong><span>available now</span></div>
       </div>
     </div>
-    <aside class="next-opening" aria-labelledby="next-available-title">
-      <p class="eyebrow" id="next-available-title">NEXT AVAILABLE BENCH</p>
-      {% if next_available %}
-      <h2>{{ next_available.id }}</h2>
-      <p class="next-location">{{ next_available.location }}</p>
-      <p class="opening-date"><span>Status</span><strong>Available now</strong></p>
-      <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=next_available.id) }}">Adopt {{ next_available.id }} <span aria-hidden="true">→</span></a>
-      {% else %}
-      <h2>All benches are reserved</h2>
-      <p>Check the availability map for upcoming openings.</p>
-      {% endif %}
-      <a class="available-link" href="{{ url_for('directory', status='available') }}#bench-map">Browse benches available now →</a>
-    </aside>
+    <div class="overview-feature">
+      <img src="{{ url_for('bench_image', filename='vcp010-r.jpg') }}" alt="The Van Cortlandt Park entrance beneath a canopy of trees">
+      <aside class="next-opening" aria-labelledby="next-available-title">
+        <p class="eyebrow" id="next-available-title">NEXT AVAILABLE BENCH</p>
+        {% if next_available %}
+        <h2>{{ next_available.id }}</h2>
+        <p class="next-location">{{ next_available.location }}</p>
+        <p class="opening-date"><span>Status</span><strong>Available now</strong></p>
+        <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=next_available.id) }}">Adopt {{ next_available.id }} <span aria-hidden="true">→</span></a>
+        {% else %}
+        <h2>All benches are reserved</h2>
+        <p>Check the availability map for upcoming openings.</p>
+        {% endif %}
+        <a class="available-link" href="{{ url_for('directory', status='available') }}#bench-map">Browse benches available now →</a>
+      </aside>
+    </div>
   </div>
 </section>
 <section class="bench-map-section shell" id="bench-map" aria-labelledby="bench-map-title" data-initial-status="{{ map_status }}">
   <div class="section-heading bench-map-heading">
-    <h2 id="bench-map-title">Explore the park.</h2>
+    <div><p class="eyebrow">PARK DIRECTORY</p><h2 id="bench-map-title">Explore the park.</h2></div>
+    <p>Choose a marker to see where each bench sits and whether it is ready to adopt.</p>
   </div>
   <div class="map-toolbar">
     <div class="map-filters" role="group" aria-label="Filter map by bench status">
@@ -62,7 +67,7 @@
 </section>
 <section class="availability shell" aria-labelledby="availability-title">
   <div class="availability-heading">
-    <h2 id="availability-title">Availability timeline</h2>
+    <div><p class="eyebrow">PLAN AHEAD</p><h2 id="availability-title">Availability timeline</h2></div>
     <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted or reserved</span><span><i class="legend-open"></i>Available</span></div>
   </div>
   <div class="map-frame" tabindex="0" aria-label="Scrollable bench availability map">

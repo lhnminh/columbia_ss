@@ -53,6 +53,10 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'alt="Bench at ' + location + b'"', response.data)
         self.assertEqual(choice.call_count, 1)
         self.assertIn(image_name, choice.call_args.args[0])
+        self.assertNotIn(
+            "Logo_of_the_New_York_City_Department_of_Parks_&_Recreation.svg.webp",
+            choice.call_args.args[0],
+        )
 
         image = self.client.get(f"/bench-images/{image_name}")
         self.assertEqual(image.status_code, 200)

@@ -85,6 +85,7 @@ def create_app(
             path.name
             for path in app.config["BENCH_IMAGE_FOLDER"].iterdir()
             if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+            and not path.name.startswith("Logo_of_the_New_York_City")
         )
 
     def random_bench_image() -> str | None:

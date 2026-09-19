@@ -11,20 +11,34 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
+  <div class="city-bar">
+    <div class="shell city-bar-inner">
+      <strong>NYC</strong>
+      <span>Van Cortlandt Park · Bronx</span>
+    </div>
+  </div>
   <header class="site-header">
     <div class="shell header-inner">
       <a class="brand" href="{{ url_for('directory') }}" aria-label="Bench by Bench home">
-        <span class="brand-mark" aria-hidden="true">⌁</span>
-        <span><strong>Bench by Bench</strong><small>VAN CORTLANDT PARK</small></span>
+        <img class="parks-mark" src="{{ url_for('bench_image', filename='Logo_of_the_New_York_City_Department_of_Parks_&_Recreation.svg.webp') }}" alt="">
+        <span class="brand-copy"><strong>Bench by Bench</strong><small>VAN CORTLANDT PARK</small></span>
       </a>
-      <nav aria-label="Main navigation"><a href="{{ url_for('directory') }}#bench-map">Explore benches <span aria-hidden="true">↗</span></a></nav>
+      <p class="agency-name">A community bench adoption project<br><strong>in New York City's third-largest park</strong></p>
     </div>
   </header>
+  <nav class="park-nav" aria-label="Main navigation">
+    <div class="shell park-nav-inner">
+      <a href="{{ url_for('directory') }}">Home</a>
+      <a href="{{ url_for('directory') }}#bench-map">Explore benches</a>
+      <a href="{{ url_for('directory') }}#availability-title">Availability</a>
+      <a class="nav-action" href="{{ url_for('directory', status='available') }}#bench-map">Find an available bench <span aria-hidden="true">→</span></a>
+    </div>
+  </nav>
   <main id="main">{% block content %}{% endblock %}</main>
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <span>Bench by Bench <span aria-hidden="true">·</span> Van Cortlandt Park</span>
-      <span>No payment is collected on this site.</span>
+      <div class="footer-brand"><strong>Bench by Bench</strong><span>Van Cortlandt Park · The Bronx</span></div>
+      <span class="footer-note">A community adoption project. No payment is collected on this site.</span>
     </div>
   </footer>
 </body>

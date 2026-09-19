@@ -40,11 +40,57 @@ class AppTests(unittest.TestCase):
         available = self.client.get("/benches/Bench31")
         self.assertIn(b"Adopt this bench", available.data)
 
+    def test_directory_leads_with_summary_and_availability_map(self) -> None:
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"30</strong><span>adopted or reserved", response.data)
+        self.assertIn(b"520</strong><span>available now", response.data)
+        summary = response.data[
+            response.data.index(b'aria-label="Bench collection summary"'):
+            response.data.index(b"NEXT AVAILABLE BENCH")
+        ]
+        self.assertNotIn(b"benches total", summary)
+        self.assertIn(b"NEXT AVAILABLE BENCH", response.data)
+        self.assertIn(b'href="/benches/Bench31/adopt">Adopt Bench31', response.data)
+        self.assertIn(b"90-DAY AVAILABILITY", response.data)
+        self.assertIn(b"Scrollable bench availability map", response.data)
+        self.assertIn(b"--bar-left:", response.data)
+        self.assertLess(response.data.index(b"NEXT AVAILABLE BENCH"), response.data.index(b'id="browse"'))
+
+    def test_next_available_advances_after_adoption(self) -> None:
+        response = self.client.get("/")
+        highlight = response.data[
+            response.data.index(b"NEXT AVAILABLE BENCH"):response.data.index(b"90-DAY AVAILABILITY")
+        ]
+        self.assertIn(b'href="/benches/Bench31/adopt">Adopt Bench31', highlight)
+
+        self.client.post("/benches/Bench31/confirm", data=self.form)
+        updated = self.client.get("/")
+        updated_highlight = updated.data[
+            updated.data.index(b"NEXT AVAILABLE BENCH"):updated.data.index(b"90-DAY AVAILABILITY")
+        ]
+        self.assertIn(b'href="/benches/Bench32/adopt">Adopt Bench32', updated_highlight)
+
+    def test_overview_remains_global_when_directory_is_filtered(self) -> None:
+        response = self.client.get("/?q=Bench31&status=available")
+        self.assertIn(b"30</strong><span>adopted or reserved", response.data)
+        self.assertIn(b'href="/benches/Bench31/adopt">Adopt Bench31', response.data)
+        self.assertIn(b"1 bench found", response.data)
+
     def test_search_filter_and_empty_state(self) -> None:
         response = self.client.get("/?q=Bench31&status=available")
         self.assertIn(b"1 bench found", response.data)
         response = self.client.get("/?q=Bench31&status=adopted")
         self.assertIn(b"No benches found", response.data)
+
+    def test_directory_filter_script_is_available(self) -> None:
+        directory = self.client.get("/")
+        self.assertIn(b'/static/directory.js', directory.data)
+        script = self.client.get("/static/directory.js")
+        self.assertEqual(script.status_code, 200)
+        self.assertIn(b"replaceDirectory", script.data)
+        self.assertIn(b"history.pushState", script.data)
+        script.close()
 
     def test_review_then_confirm(self) -> None:
         review = self.client.post("/benches/Bench31/review", data=self.form)

@@ -1,25 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Explore benches{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="shell hero-grid">
-    <div class="hero-copy">
+<section class="home-overview">
+  <div class="shell overview-grid">
+    <div class="overview-copy">
       <p class="eyebrow light">A PLACE TO PAUSE</p>
-      <h1>A bench can hold <em>a story.</em></h1>
-      <p>Find a place of your own in our fictional Van Cortlandt Park bench adoption demo. Explore the collection, then choose a bench to adopt.</p>
-      <a class="button button-light" href="#browse">Explore the benches <span aria-hidden="true">↓</span></a>
+      <h1>Find a bench <em>without the wait.</em></h1>
+      <p>See what is open now and when each fictional bench becomes available.</p>
+      <div class="summary-counts" aria-label="Bench collection summary">
+        <div><strong>{{ adopted_count }}</strong><span>adopted or reserved</span></div>
+        <div><strong>{{ bench_count - adopted_count }}</strong><span>available now</span></div>
+      </div>
     </div>
-    <div class="hero-art" aria-hidden="true">
-      <div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div>
-      <div class="bench-illustration"><i class="slat back-one"></i><i class="slat back-two"></i><i class="slat seat"></i><i class="leg left"></i><i class="leg right"></i></div>
-      <span class="art-caption">A MOMENT, MADE YOURS.</span>
-    </div>
+    <aside class="next-opening" aria-labelledby="next-available-title">
+      <p class="eyebrow" id="next-available-title">NEXT AVAILABLE BENCH</p>
+      {% if next_available %}
+      <h2>{{ next_available.id }}</h2>
+      <p class="next-location">{{ next_available.location }}</p>
+      <p class="opening-date"><span>Status</span><strong>Available now</strong></p>
+      <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=next_available.id) }}">Adopt {{ next_available.id }} <span aria-hidden="true">→</span></a>
+      {% else %}
+      <h2>All benches are reserved</h2>
+      <p>Check the availability map for upcoming openings.</p>
+      {% endif %}
+      <a class="available-link" href="{{ url_for('directory', status='available') }}#browse">Browse benches available now →</a>
+    </aside>
   </div>
 </section>
-<section class="numbers shell" aria-label="Bench collection summary">
-  <div><strong>{{ bench_count }}</strong><span>fictional benches</span></div>
-  <div><strong>{{ bench_count - adopted_count }}</strong><span>available to adopt</span></div>
-  <div><strong>{{ adopted_count }}</strong><span>adopted or reserved</span></div>
+<section class="availability shell" aria-labelledby="availability-title">
+  <div class="availability-heading">
+    <div><p class="eyebrow">90-DAY AVAILABILITY</p><h2 id="availability-title">Bench map</h2></div>
+    <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted or reserved</span><span><i class="legend-open"></i>Available</span></div>
+  </div>
+  <p class="availability-help">Scroll down to explore every bench. Select a bench name to see its details.</p>
+  <div class="map-frame" tabindex="0" aria-label="Scrollable bench availability map">
+    <div class="gantt-map">
+      <div class="gantt-axis">
+        <span>Bench</span>
+        <div class="date-axis">
+          {% for map_date in map_dates %}<time datetime="{{ map_date.isoformat() }}">{{ map_date.strftime('%b %-d') }}</time>{% endfor %}
+        </div>
+      </div>
+      <div class="gantt-rows">
+        {% for row in availability_rows %}
+        <div class="gantt-row">
+          <a class="gantt-label" href="{{ url_for('bench_detail', bench_id=row.bench.id) }}"><strong>{{ row.bench.id }}</strong><span>{{ row.bench.location }}</span></a>
+          <div class="gantt-track">
+            {% if row.bar %}<span class="reservation-bar" style="--bar-left: {{ '%.3f'|format(row.bar.left) }}%; --bar-width: {{ '%.3f'|format(row.bar.width) }}%" title="Reserved {{ row.bar.start_date }} through {{ row.bar.end_date }}"><span class="sr-only">Reserved {{ row.bar.start_date }} through {{ row.bar.end_date }}</span></span>{% else %}<span class="sr-only">Available throughout the displayed period</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 </section>
 <section class="browse shell" id="browse">
   <div class="section-heading"><div><p class="eyebrow">THE COLLECTION</p><h2>Find your bench.</h2></div><p>Every bench here is sample data for this demo.</p></div>
@@ -53,4 +86,5 @@
     {% if page < pages %}<a href="{{ url_for('directory', q=search, status=status, page=page+1) }}#browse">Next →</a>{% endif %}
   </nav>{% endif %}
 </section>
+<script src="{{ url_for('static', filename='directory.js') }}" defer></script>
 {% endblock %}

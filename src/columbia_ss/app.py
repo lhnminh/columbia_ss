@@ -3,13 +3,42 @@
 from __future__ import annotations
 
 import os
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from flask import Flask, abort, g, redirect, render_template, request, url_for
 
 from . import database, postgres
 from .database import BenchUnavailable, BookingError, park_today, validate_booking
+
+
+def _as_date(value: date | str) -> date:
+    """Normalize dates returned by SQLite and Postgres."""
+    return value if isinstance(value, date) else date.fromisoformat(value)
+
+
+def _availability_overview(benches, *, today: date) -> tuple[dict | None, list[dict]]:
+    """Build the next-available highlight and 90-day availability map."""
+    horizon_days = 90
+    next_available = next(
+        (bench for bench in benches if bench["adoption_id"] is None), None
+    )
+
+    map_rows = []
+    for bench in benches:
+        bar = None
+        if bench["adoption_id"] is not None:
+            start = max(_as_date(bench["start_date"]), today)
+            end = min(_as_date(bench["end_date"]), today + timedelta(days=horizon_days))
+            if start <= end:
+                bar = {
+                    "left": max(0, (start - today).days) / horizon_days * 100,
+                    "width": max(1.5, (end - start).days / horizon_days * 100),
+                    "start_date": _as_date(bench["start_date"]),
+                    "end_date": _as_date(bench["end_date"]),
+                }
+        map_rows.append({"bench": bench, "bar": bar})
+    return next_available, map_rows
 
 
 def create_app(database_path: str | Path | None = None) -> Flask:
@@ -63,6 +92,8 @@ def create_app(database_path: str | Path | None = None) -> Flask:
         benches = all_benches[(page - 1) * page_size : page * page_size]
         counts = storage.list_benches(db())
         adopted_count = sum(bench["adoption_id"] is not None for bench in counts)
+        today = park_today()
+        next_available, availability_rows = _availability_overview(counts, today=today)
         return render_template(
             "directory.html",
             benches=benches,
@@ -73,6 +104,9 @@ def create_app(database_path: str | Path | None = None) -> Flask:
             total=len(all_benches),
             bench_count=len(counts),
             adopted_count=adopted_count,
+            next_available=next_available,
+            availability_rows=availability_rows,
+            map_dates=[today + timedelta(days=offset) for offset in (0, 30, 60, 90)],
         )
 
     @app.get("/benches/<bench_id>")

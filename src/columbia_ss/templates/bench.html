@@ -6,7 +6,7 @@
   <div class="detail-grid">
     <div class="detail-visual">
       {% if bench_image %}<img class="detail-photo" src="{{ url_for('bench_image', filename=bench_image) }}" alt="Bench at {{ bench.location }}">{% endif %}
-      <span class="detail-kicker">A PLACE TO PAUSE</span><span class="detail-big">{{ bench.id }}</span><span class="detail-location">{{ bench.location }}</span>
+      <span class="detail-big">{{ bench.id }}</span><span class="detail-location">{{ bench.location }}</span>
     </div>
     <div class="detail-content">
       <p class="eyebrow">BENCH DETAILS</p>

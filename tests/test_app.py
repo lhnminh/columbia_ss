@@ -34,6 +34,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Bench1", directory.data)
         adopted = self.client.get("/benches/Bench1")
         self.assertIn(b"Anonymous Park Supporter", adopted.data)
+        self.assertNotIn(b"A PLACE TO PAUSE", adopted.data)
         available = self.client.get("/benches/Bench31")
         self.assertIn(b"Adopt this bench", available.data)
 
@@ -58,11 +59,25 @@ class AppTests(unittest.TestCase):
         self.assertEqual(image.mimetype, "image/webp")
         image.close()
 
+    def test_bench_svg_is_used_as_the_site_favicon(self) -> None:
+        response = self.client.get("/")
+        self.assertIn(
+            b'<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
+            response.data,
+        )
+
+        favicon = self.client.get("/favicon.svg")
+        self.assertEqual(favicon.status_code, 200)
+        self.assertEqual(favicon.mimetype, "image/svg+xml")
+        self.assertIn(b"<svg", favicon.data)
+        favicon.close()
+
     def test_directory_leads_with_summary_and_availability_map(self) -> None:
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Adopt a bench", response.data)
         self.assertIn(b"today.", response.data)
+        self.assertIn(b'href="/#bench-map">Explore benches', response.data)
         self.assertIn(b"30</strong><span>adopted or reserved", response.data)
         self.assertIn(b"520</strong><span>available now", response.data)
         summary = response.data[
@@ -72,32 +87,41 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b"benches total", summary)
         self.assertIn(b"NEXT AVAILABLE BENCH", response.data)
         self.assertIn(b'href="/benches/Bench31/adopt">Adopt Bench31', response.data)
-        self.assertIn(b"60-DAY HISTORY", response.data)
-        self.assertIn(b"90-DAY OUTLOOK", response.data)
         self.assertIn(b"Scrollable bench availability map", response.data)
         self.assertIn(b'class="today-date"', response.data)
         self.assertIn(b">Today</strong>", response.data)
         self.assertIn(self.today.strftime("%b %-d").encode(), response.data)
         self.assertIn(b'class="today-line"', response.data)
-        self.assertIn(b"Scroll left to review the last 60 days", response.data)
         self.assertNotIn(b"demo", response.data.lower())
         self.assertNotIn(b"fictional", response.data.lower())
         self.assertIn(b"--bar-left:", response.data)
         self.assertIn(b"Availability timeline", response.data)
+        removed_copy = (
+            b"60-DAY HISTORY",
+            b"90-DAY OUTLOOK",
+            b"Scroll left to review the last 60 days",
+            b"Prototype locations",
+            b"Bench positions are generated for planning purposes",
+            b"See every bench across Van Cortlandt Park",
+            b"A PLACE TO PAUSE",
+            b"THE COLLECTION",
+        )
+        for text in removed_copy:
+            self.assertNotIn(text, response.data)
         self.assertLess(response.data.index(b"NEXT AVAILABLE BENCH"), response.data.index(b'id="bench-map"'))
         self.assertLess(response.data.index(b'id="bench-map"'), response.data.index(b'id="availability-title"'))
 
     def test_next_available_advances_after_adoption(self) -> None:
         response = self.client.get("/")
         highlight = response.data[
-            response.data.index(b"NEXT AVAILABLE BENCH"):response.data.index(b"60-DAY HISTORY")
+            response.data.index(b"NEXT AVAILABLE BENCH"):response.data.index(b'id="availability-title"')
         ]
         self.assertIn(b'href="/benches/Bench31/adopt">Adopt Bench31', highlight)
 
         self.client.post("/benches/Bench31/confirm", data=self.form)
         updated = self.client.get("/")
         updated_highlight = updated.data[
-            updated.data.index(b"NEXT AVAILABLE BENCH"):updated.data.index(b"60-DAY HISTORY")
+            updated.data.index(b"NEXT AVAILABLE BENCH"):updated.data.index(b'id="availability-title"')
         ]
         self.assertIn(b'href="/benches/Bench32/adopt">Adopt Bench32', updated_highlight)
 
@@ -130,7 +154,8 @@ class AppTests(unittest.TestCase):
 
         self.assertIn(b'id="geographic-map"', response.data)
         self.assertIn(b'id="bench-map-data"', response.data)
-        self.assertIn(b"Prototype locations", response.data)
+        self.assertIn(b'"image_url": "/bench-images/', response.data)
+        self.assertNotIn(b"Prototype locations", response.data)
         self.assertIn(b'data-map-filter="all"', response.data)
         self.assertIn(b'data-map-filter="available"', response.data)
         self.assertIn(b'data-map-filter="adopted"', response.data)
@@ -153,6 +178,9 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"scrollWheelZoom: true", script.data)
         self.assertIn(b"frame.scrollLeft", script.data)
         self.assertIn(b"ADOPTED UNTIL ${bench.adoption_end_date}", script.data)
+        self.assertIn(b'map-selection-image', script.data)
+        self.assertIn(b'if (bench.image_url) {', script.data)
+        self.assertIn(b'if (image) selection.append(image)', script.data)
         self.assertNotIn(b"ADOPTED OR RESERVED", script.data)
         script.close()
 
@@ -166,6 +194,16 @@ class AppTests(unittest.TestCase):
         self.assertIn(b".today-line{position:absolute;z-index:1", stylesheet.data)
         self.assertIn(b".bench-marker-adopted{border-radius:50%;transform:none}", stylesheet.data)
         self.assertIn(b"background:conic-gradient(#3e8060", stylesheet.data)
+        self.assertIn(
+            b'li[data-list-status="available"] a span:last-child',
+            stylesheet.data,
+        )
+        self.assertIn(b"background:var(--mint);color:#285944", stylesheet.data)
+        self.assertIn(
+            b'li[data-list-status="adopted"] a span:last-child',
+            stylesheet.data,
+        )
+        self.assertIn(b"background:#f3d486;color:#684914", stylesheet.data)
         stylesheet.close()
 
     def test_map_contains_every_bench_and_generated_coordinates(self) -> None:

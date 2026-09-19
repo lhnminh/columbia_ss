@@ -9,7 +9,6 @@
 <section class="home-overview">
   <div class="shell overview-grid">
     <div class="overview-copy">
-      <p class="eyebrow light">A PLACE TO PAUSE</p>
       <h1>Adopt a bench <em>today.</em></h1>
       <p>Explore current availability and choose a place to support in Van Cortlandt Park.</p>
       <div class="summary-counts" aria-label="Bench collection summary">
@@ -34,12 +33,7 @@
 </section>
 <section class="bench-map-section shell" id="bench-map" aria-labelledby="bench-map-title" data-initial-status="{{ map_status }}">
   <div class="section-heading bench-map-heading">
-    <div><p class="eyebrow">THE COLLECTION</p><h2 id="bench-map-title">Explore the park.</h2></div>
-    <p>See every bench across Van Cortlandt Park and filter by current availability.</p>
-  </div>
-  <div class="prototype-notice" role="note">
-    <strong>Prototype locations</strong>
-    <span>Bench positions are generated for planning purposes and do not represent surveyed locations.</span>
+    <h2 id="bench-map-title">Explore the park.</h2>
   </div>
   <div class="map-toolbar">
     <div class="map-filters" role="group" aria-label="Filter map by bench status">
@@ -50,7 +44,7 @@
     <p class="map-result-count" aria-live="polite"><strong id="map-result-count">{{ bench_count }}</strong> <span id="map-result-label">benches shown</span></p>
   </div>
   <div class="geographic-map-layout">
-    <div id="geographic-map" class="geographic-map" aria-label="Interactive map of prototype bench locations"></div>
+    <div id="geographic-map" class="geographic-map" aria-label="Interactive map of bench locations"></div>
     <aside class="map-selection" id="map-selection" aria-live="polite">
       <p class="eyebrow">SELECT A BENCH</p>
       <h3>Choose a marker</h3>
@@ -68,10 +62,9 @@
 </section>
 <section class="availability shell" aria-labelledby="availability-title">
   <div class="availability-heading">
-    <div><p class="eyebrow">60-DAY HISTORY · 90-DAY OUTLOOK</p><h2 id="availability-title">Availability timeline</h2></div>
+    <h2 id="availability-title">Availability timeline</h2>
     <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted or reserved</span><span><i class="legend-open"></i>Available</span></div>
   </div>
-  <p class="availability-help">Scroll left to review the last 60 days, right for upcoming availability, and down to explore every bench.</p>
   <div class="map-frame" tabindex="0" aria-label="Scrollable bench availability map">
     <div class="gantt-map" style="--today-left: {{ today_position }}%">
       <div class="gantt-axis">

@@ -89,6 +89,14 @@
     const showBench = (bench) => {
       selection.replaceChildren();
 
+      let image = null;
+      if (bench.image_url) {
+        image = document.createElement("img");
+        image.className = "map-selection-image";
+        image.src = bench.image_url;
+        image.alt = `Representative view of ${bench.id} at ${bench.location}`;
+        image.decoding = "async";
+      }
       const eyebrow = document.createElement("p");
       eyebrow.className = "eyebrow";
       eyebrow.textContent = bench.available
@@ -107,6 +115,7 @@
       action.href = bench.action_url;
       action.textContent = bench.action_label;
 
+      if (image) selection.append(image);
       selection.append(eyebrow, heading, location, status, action);
     };
 

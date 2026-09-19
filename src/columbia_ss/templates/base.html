@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Explore and adopt a bench in Van Cortlandt Park.">
+  <link rel="icon" href="{{ url_for('favicon') }}" type="image/svg+xml">
   <title>{% block title %}Bench by Bench{% endblock %} · Van Cortlandt Park</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   {% block head %}{% endblock %}
@@ -16,7 +17,7 @@
         <span class="brand-mark" aria-hidden="true">⌁</span>
         <span><strong>Bench by Bench</strong><small>VAN CORTLANDT PARK</small></span>
       </a>
-      <nav aria-label="Main navigation"><a href="{{ url_for('directory') }}">Explore benches <span aria-hidden="true">↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="{{ url_for('directory') }}#bench-map">Explore benches <span aria-hidden="true">↗</span></a></nav>
     </div>
   </header>
   <main id="main">{% block content %}{% endblock %}</main>

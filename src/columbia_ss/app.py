@@ -79,14 +79,28 @@ def create_app(
         raise RuntimeError("DATABASE_URL is required")
     storage = storage_backend
 
-    def random_bench_image() -> str | None:
-        """Choose an image from the repository's bench image folder."""
-        image_names = sorted(
+    def bench_image_names() -> list[str]:
+        """Return the repository's supported bench image filenames."""
+        return sorted(
             path.name
             for path in app.config["BENCH_IMAGE_FOLDER"].iterdir()
             if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
         )
+
+    def random_bench_image() -> str | None:
+        """Choose an image from the repository's bench image folder."""
+        image_names = bench_image_names()
         return random.choice(image_names) if image_names else None
+
+    def representative_bench_image(
+        bench_id: str, image_names: list[str],
+    ) -> str | None:
+        """Assign a stable representative image to a bench."""
+        if not image_names:
+            return None
+        number = "".join(character for character in bench_id if character.isdigit())
+        image_index = (int(number) - 1) if number else sum(map(ord, bench_id))
+        return image_names[image_index % len(image_names)]
 
     def db():
         if "database" not in g:
@@ -124,8 +138,11 @@ def create_app(
         next_available, availability_rows = _availability_overview(
             benches, timeline_adoptions, today=today
         )
-        map_benches = [
-            {
+        image_names = bench_image_names()
+        map_benches = []
+        for bench in benches:
+            image_name = representative_bench_image(bench["id"], image_names)
+            map_benches.append({
                 "id": bench["id"],
                 "location": bench["location"],
                 "latitude": bench["latitude"],
@@ -137,6 +154,11 @@ def create_app(
                     else None
                 ),
                 "detail_url": url_for("bench_detail", bench_id=bench["id"]),
+                "image_url": (
+                    url_for("bench_image", filename=image_name)
+                    if image_name is not None
+                    else None
+                ),
                 "action_url": url_for(
                     "adoption_form" if bench["adoption_id"] is None else "bench_detail",
                     bench_id=bench["id"],
@@ -144,9 +166,7 @@ def create_app(
                 "action_label": (
                     "Adopt this bench" if bench["adoption_id"] is None else "View bench"
                 ),
-            }
-            for bench in benches
-        ]
+            })
         return render_template(
             "directory.html",
             bench_count=len(benches),
@@ -181,6 +201,13 @@ def create_app(
         if Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
             abort(404)
         return send_from_directory(app.config["BENCH_IMAGE_FOLDER"], filename)
+
+    @app.get("/favicon.svg")
+    def favicon():
+        """Serve the bench icon used as the site favicon."""
+        return send_from_directory(
+            app.config["BENCH_IMAGE_FOLDER"], "noun_bench_3368544.svg"
+        )
 
     @app.get("/benches/<bench_id>/adopt")
     def adoption_form(bench_id: str):

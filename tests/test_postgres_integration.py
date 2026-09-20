@@ -87,6 +87,12 @@ class PostgresIntegrationTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=2) as executor:
             self.assertCountEqual(list(executor.map(attempt, ("First", "Second"))),
                                   ["booked", "unavailable"])
+        later_id = postgres.create_adoption(
+            self.connection, "Bench344", "Later Visitor",
+            (today + timedelta(days=11)).isoformat(),
+            (today + timedelta(days=20)).isoformat(), "10",
+        )
+        self.assertIsNotNone(later_id)
         self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 344)
         admin.reset(self.connection)
         self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 343)
@@ -110,8 +116,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             cursor.execute(
                 """SELECT a.start_date, a.end_date
                    FROM adoptions a
-                   JOIN adopters p ON p.id = a.adopter_id
-                   WHERE p.public_name = 'Anonymous Park Supporter'"""
+                   WHERE a.is_seeded"""
             )
             timelines = cursor.fetchall()
         self.assertEqual(

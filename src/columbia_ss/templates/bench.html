@@ -16,8 +16,8 @@
       <dl class="detail-list"><div><dt>Location</dt><dd>{{ bench.location }}</dd></div>
       {% if bench.adoption_id %}<div><dt>Adopted by</dt><dd>{{ bench.public_name }}</dd></div><div><dt>Adoption dates</dt><dd>{{ bench.start_date }} – {{ bench.end_date }}</dd></div>{% endif %}
       </dl>
-      {% if bench.adoption_id %}<p class="notice">This bench is currently adopted or reserved. It will become available after {{ bench.end_date }}.</p>
-      {% else %}<a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=bench.id) }}">Adopt this bench <span aria-hidden="true">→</span></a><p class="fine-print">Choose your own dates and amount. No payment is collected.</p>{% endif %}
+      {% if bench.adoption_id %}<p class="notice">This bench is adopted for the dates shown above, but it can still be adopted for non-overlapping dates.</p>{% endif %}
+      <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=bench.id) }}">Adopt this bench <span aria-hidden="true">→</span></a><p class="fine-print">Choose non-overlapping dates and your own amount. No payment is collected.</p>
     </div>
   </div>
 </section>

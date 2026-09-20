@@ -8,6 +8,7 @@ from random import Random
 from columbia_ss.domain import (
     BenchUnavailable,
     BookingError,
+    generated_adopter_name,
     generate_initial_adoption_timelines,
     park_today,
     validate_booking,
@@ -38,7 +39,7 @@ class FakeStorage:
             today=today, randomizer=Random(2026)
         ):
             self._store_adoption(
-                bench_id=f"Bench{number}", public_name="Anonymous Park Supporter",
+                bench_id=f"Bench{number}", public_name=generated_adopter_name(number),
                 start_date=start.isoformat(), end_date=end.isoformat(), amount_cents=10000,
             )
 
@@ -59,7 +60,23 @@ class FakeStorage:
         rows = []
         for bench in self.benches.values():
             row = dict(bench)
-            if row["end_date"] is not None and row["end_date"] < current_date:
+            upcoming = sorted(
+                (
+                    adoption for adoption in self.adoptions.values()
+                    if adoption["bench_id"] == row["id"]
+                    and adoption["end_date"] >= current_date
+                ),
+                key=lambda adoption: (adoption["start_date"], adoption["id"]),
+            )
+            if upcoming:
+                adoption = upcoming[0]
+                row.update(
+                    adoption_id=adoption["id"],
+                    start_date=adoption["start_date"],
+                    end_date=adoption["end_date"],
+                    public_name=adoption["public_name"],
+                )
+            else:
                 row.update(
                     adoption_id=None, start_date=None, end_date=None, public_name=None
                 )
@@ -103,8 +120,15 @@ class FakeStorage:
         )
         if bench_id not in self.benches:
             raise BookingError("This bench does not exist.")
-        if self.get_bench(self, bench_id, today=current_date)["adoption_id"] is not None:
-            raise BenchUnavailable("This bench was already booked. Please choose another bench.")
+        if any(
+            adoption["bench_id"] == bench_id
+            and adoption["start_date"] <= end
+            and adoption["end_date"] >= start
+            for adoption in self.adoptions.values()
+        ):
+            raise BenchUnavailable(
+                "Those dates overlap an existing adoption. Please choose other dates."
+            )
         return self._store_adoption(
             bench_id=bench_id, public_name=name, start_date=start,
             end_date=end, amount_cents=cents,
@@ -128,8 +152,10 @@ class FakeStorage:
             "amount_cents": amount_cents,
         }
         self.adoptions[adoption_id] = adoption
-        self.benches[bench_id].update(
-            adoption_id=adoption_id, public_name=public_name,
-            start_date=start_date, end_date=end_date,
-        )
+        existing_start = self.benches[bench_id]["start_date"]
+        if existing_start is None or start_date < existing_start:
+            self.benches[bench_id].update(
+                adoption_id=adoption_id, public_name=public_name,
+                start_date=start_date, end_date=end_date,
+            )
         return adoption_id

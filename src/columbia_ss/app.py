@@ -57,6 +57,7 @@ def _availability_overview(
                 {
                     "left": (start - window_start).days / window_days * 100,
                     "width": max(0.75, (end - start).days / window_days * 100),
+                    "public_name": adoption["public_name"],
                     "start_date": _as_date(adoption["start_date"]),
                     "end_date": _as_date(adoption["end_date"]),
                 }
@@ -150,6 +151,7 @@ def create_app(
                 "latitude": bench["latitude"],
                 "longitude": bench["longitude"],
                 "available": bench["adoption_id"] is None,
+                "public_name": bench["public_name"],
                 "adoption_end_date": (
                     _as_date(bench["end_date"]).isoformat()
                     if bench["end_date"] is not None
@@ -161,13 +163,8 @@ def create_app(
                     if image_name is not None
                     else None
                 ),
-                "action_url": url_for(
-                    "adoption_form" if bench["adoption_id"] is None else "bench_detail",
-                    bench_id=bench["id"],
-                ),
-                "action_label": (
-                    "Adopt this bench" if bench["adoption_id"] is None else "View bench"
-                ),
+                "action_url": url_for("adoption_form", bench_id=bench["id"]),
+                "action_label": "Adopt this bench",
             })
         return render_template(
             "directory.html",
@@ -217,8 +214,6 @@ def create_app(
         bench = storage.get_bench(db(), bench_id)
         if bench is None:
             abort(404)
-        if bench["adoption_id"] is not None:
-            return redirect(url_for("bench_detail", bench_id=bench_id))
         return render_template("adopt.html", bench=bench, values={}, error=None)
 
     @app.post("/benches/<bench_id>/review")
@@ -232,11 +227,6 @@ def create_app(
             "end_date": request.form.get("end_date", ""),
             "amount": request.form.get("amount", ""),
         }
-        if bench["adoption_id"] is not None:
-            return render_template(
-                "adopt.html", bench=bench, values=values,
-                error="This bench was already booked. Please choose another bench."
-            ), 409
         try:
             name, start, end, cents = validate_booking(**values)
         except BookingError as error:

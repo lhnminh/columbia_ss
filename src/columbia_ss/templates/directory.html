@@ -83,7 +83,7 @@
         <div class="gantt-row">
           <a class="gantt-label" href="{{ url_for('bench_detail', bench_id=row.bench.id) }}"><strong>{{ row.bench.id }}</strong><span>{{ row.bench.location }}</span></a>
           <div class="gantt-track"><span class="today-line" aria-hidden="true"></span>
-            {% for bar in row.bars %}<span class="reservation-bar" style="--bar-left: {{ '%.3f'|format(bar.left) }}%; --bar-width: {{ '%.3f'|format(bar.width) }}%" title="Reserved {{ bar.start_date }} through {{ bar.end_date }}"><span class="sr-only">Reserved {{ bar.start_date }} through {{ bar.end_date }}</span></span>{% else %}<span class="sr-only">Available throughout the displayed period</span>{% endfor %}
+            {% for bar in row.bars %}<span class="reservation-bar" style="--bar-left: {{ '%.3f'|format(bar.left) }}%; --bar-width: {{ '%.3f'|format(bar.width) }}%" data-adopter="{{ bar.public_name }}" tabindex="0"><span class="sr-only">Adopted by {{ bar.public_name }} from {{ bar.start_date }} through {{ bar.end_date }}</span></span>{% else %}<span class="sr-only">Available throughout the displayed period</span>{% endfor %}
           </div>
         </div>
         {% endfor %}

@@ -107,11 +107,15 @@ def create_adoption(
             if cursor.fetchone() is None:
                 raise BookingError("This bench does not exist.")
             cursor.execute(
-                "SELECT 1 FROM adoptions WHERE bench_id = %s AND end_date >= %s LIMIT 1",
-                (bench_id, current_date),
+                """SELECT 1 FROM adoptions
+                   WHERE bench_id = %s AND start_date <= %s AND end_date >= %s
+                   LIMIT 1""",
+                (bench_id, end, start),
             )
             if cursor.fetchone():
-                raise BenchUnavailable("This bench was already booked. Please choose another bench.")
+                raise BenchUnavailable(
+                    "Those dates overlap an existing adoption. Please choose other dates."
+                )
             cursor.execute(
                 "INSERT INTO adopters (public_name) VALUES (%s) RETURNING id", (name,)
             )

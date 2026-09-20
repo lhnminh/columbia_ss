@@ -6,6 +6,7 @@ from random import Random
 
 from columbia_ss.domain import (
     BookingError,
+    generated_adopter_name,
     generate_initial_adoption_timelines,
     park_today,
     validate_booking,
@@ -31,6 +32,13 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(sum(start > self.today for start in starts), 114)
         self.assertTrue(all(start < end for start, end in zip(starts, ends, strict=True)))
         self.assertTrue(all(end <= self.today + timedelta(days=90) for end in ends))
+
+    def test_generated_adopter_names_are_stable_and_varied(self) -> None:
+        names = [generated_adopter_name(number) for number in range(1, 344)]
+
+        self.assertEqual(generated_adopter_name(1), generated_adopter_name(1))
+        self.assertGreater(len(set(names)), 200)
+        self.assertTrue(all(name[-2] == " " and name[-1].isupper() for name in names))
 
     def test_booking_normalizes_name_and_exact_cents(self) -> None:
         name, start, end, cents = validate_booking(

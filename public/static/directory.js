@@ -6,6 +6,52 @@
     frame.scrollLeft = Math.max(0, todayLine.offsetLeft - 16);
   };
 
+  const initializeTimelineTooltips = () => {
+    const bars = [...document.querySelectorAll(".reservation-bar[data-adopter]")];
+    if (!bars.length) return;
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "timeline-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.hidden = true;
+    document.body.append(tooltip);
+
+    const positionTooltip = (x, y) => {
+      const gap = 12;
+      const edge = 8;
+      const left = Math.min(x + gap, window.innerWidth - tooltip.offsetWidth - edge);
+      let top = y - tooltip.offsetHeight - gap;
+      if (top < edge) top = y + gap;
+      tooltip.style.left = `${Math.max(edge, left)}px`;
+      tooltip.style.top = `${top}px`;
+    };
+
+    const showTooltip = (bar, x, y) => {
+      tooltip.textContent = bar.dataset.adopter;
+      tooltip.hidden = false;
+      positionTooltip(x, y);
+    };
+
+    bars.forEach((bar) => {
+      bar.addEventListener("pointerenter", (event) => {
+        showTooltip(bar, event.clientX, event.clientY);
+      });
+      bar.addEventListener("pointermove", (event) => {
+        positionTooltip(event.clientX, event.clientY);
+      });
+      bar.addEventListener("pointerleave", () => {
+        tooltip.hidden = true;
+      });
+      bar.addEventListener("focus", () => {
+        const bounds = bar.getBoundingClientRect();
+        showTooltip(bar, bounds.left + bounds.width / 2, bounds.top);
+      });
+      bar.addEventListener("blur", () => {
+        tooltip.hidden = true;
+      });
+    });
+  };
+
   const initializeGeographicMap = () => {
     const section = document.querySelector("#bench-map");
     const mapElement = document.querySelector("#geographic-map");
@@ -107,7 +153,7 @@
       eyebrow.className = "eyebrow";
       eyebrow.textContent = bench.available
         ? "AVAILABLE NOW"
-        : `ADOPTED UNTIL ${bench.adoption_end_date}`;
+        : `ADOPTED BY ${bench.public_name} UNTIL ${bench.adoption_end_date}`;
       const heading = document.createElement("h3");
       heading.textContent = bench.id;
       const location = document.createElement("p");
@@ -239,5 +285,6 @@
   };
 
   initializeTimelineScroll();
+  initializeTimelineTooltips();
   initializeGeographicMap();
 })();

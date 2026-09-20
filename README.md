@@ -27,9 +27,9 @@ uv run python -m unittest discover -s tests -v
 
 - A booking uses the real current date in `America/New_York`. The donor chooses a start date no earlier than today and an end date after the start date.
 - The end date is inclusive. The bench becomes available the next day.
-- A future-dated booking reserves the bench immediately. The directory labels it **Adopted** and displays its dates.
+- A future-dated booking appears immediately in the directory as **Adopted** with its dates. The same bench can receive additional adoptions for non-overlapping date ranges.
 - The amount is stored exactly as integer cents; it is not a payment. A public name is stored for each booking, without contact details or accounts.
-- A booking is committed in one Postgres transaction with a bench-row lock, so a competing submission cannot also reserve the same bench.
+- A booking is committed in one Postgres transaction with a bench-row lock, so competing submissions cannot reserve overlapping dates for the same bench.
 - Public bookings must end within 90 days of the current New York date.
 
 The app uses three tables: `benches`, `adopters`, and `adoptions`. Each bench stores the generated latitude and longitude used by the Leaflet and OpenStreetMap view.
@@ -47,7 +47,7 @@ uv run python -m columbia_ss.admin migrate
 uv run python -m columbia_ss.admin seed
 ```
 
-`migrate` creates the three tables and index, adds coordinate columns to existing installations, and backfills any missing prototype positions. `seed` adds 550 benches and 343 initial adoptions in one transaction. Running either command again preserves existing bookings. App startup does neither operation.
+`migrate` creates the three tables and index, adds coordinate columns to existing installations, backfills any missing prototype positions, and gives legacy demo adopters stable randomized public names. `seed` adds 550 benches and 343 initial adoptions in one transaction. Running either command again preserves existing visitor bookings. App startup does neither operation.
 
 After deploying the 343-adoption baseline to an existing database, bring the current total to exactly 343 without changing any visitor-created booking:
 
@@ -67,7 +67,7 @@ uv run python -m columbia_ss.admin refresh-locations
 
 The update runs in one transaction and expects the complete 550-bench inventory.
 
-To generate new timelines for all anonymous seeded adoptions without changing visitor bookings, run:
+To generate new timelines for all generated seeded adoptions without changing visitor bookings, run:
 
 ```sh
 uv run python -m columbia_ss.admin refresh-timelines

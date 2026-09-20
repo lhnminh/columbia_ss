@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import columbia_ss
 from columbia_ss import create_app
-from columbia_ss.domain import park_today
+from columbia_ss.domain import generated_adopter_name, park_today
 
 from fake_storage import FakeStorage
 
@@ -33,7 +33,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"550", directory.data)
         self.assertIn(b"Bench1", directory.data)
         adopted = self.client.get("/benches/Bench1")
-        self.assertIn(b"Anonymous Park Supporter", adopted.data)
+        self.assertIn(generated_adopter_name(1).encode(), adopted.data)
+        self.assertIn(b"Adopt this bench", adopted.data)
         self.assertNotIn(b"A PLACE TO PAUSE", adopted.data)
         available = self.client.get("/benches/Bench344")
         self.assertIn(b"Adopt this bench", available.data)
@@ -159,7 +160,13 @@ class AppTests(unittest.TestCase):
         response = self.client.get("/")
 
         self.assertIn(
-            f'title="Reserved {start} through {end}"'.encode(), response.data
+            b'data-adopter="Recent Supporter" tabindex="0"',
+            response.data,
+        )
+        self.assertNotIn(b'title="Adopted by Recent Supporter', response.data)
+        self.assertIn(
+            f'Adopted by Recent Supporter from {start} through {end}'.encode(),
+            response.data,
         )
         self.assertIn(b'href="/benches/Bench344/adopt">Adopt Bench344', response.data)
 
@@ -171,6 +178,9 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'id="park-boundary-data"', response.data)
         self.assertIn(b'"gispropnum": "X092"', response.data)
         self.assertIn(b'"image_url": "/bench-images/', response.data)
+        self.assertIn(
+            f'"public_name": "{generated_adopter_name(1)}"'.encode(), response.data
+        )
         self.assertNotIn(b"Prototype locations", response.data)
         self.assertIn(b'data-map-filter="all"', response.data)
         self.assertIn(b'data-map-filter="available"', response.data)
@@ -201,10 +211,18 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"applyFilter", script.data)
         self.assertIn(b"scrollWheelZoom: true", script.data)
         self.assertIn(b"frame.scrollLeft", script.data)
-        self.assertIn(b"ADOPTED UNTIL ${bench.adoption_end_date}", script.data)
+        self.assertIn(b"initializeTimelineTooltips", script.data)
+        self.assertIn(b'bar.addEventListener("pointermove"', script.data)
+        self.assertIn(b"positionTooltip(event.clientX, event.clientY)", script.data)
+        self.assertIn(
+            b"ADOPTED BY ${bench.public_name} UNTIL ${bench.adoption_end_date}",
+            script.data,
+        )
         self.assertIn(b'map-selection-image', script.data)
         self.assertIn(b'if (bench.image_url) {', script.data)
         self.assertIn(b'if (image) selection.append(image)', script.data)
+        self.assertNotIn(b'map-selection-adopter', script.data)
+        self.assertNotIn(b'`Adopted by ${bench.public_name}`', script.data)
         self.assertNotIn(b"ADOPTED OR RESERVED", script.data)
         script.close()
 
@@ -216,10 +234,16 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b".nav-availability{box-shadow", stylesheet.data)
         self.assertIn(b".gantt-axis{position:sticky;top:0;z-index:5", stylesheet.data)
         self.assertIn(b".gantt-axis>span{position:sticky;left:0;z-index:4", stylesheet.data)
-        self.assertIn(b".gantt-label{position:sticky;left:0;z-index:3", stylesheet.data)
+        self.assertIn(b".gantt-label{position:sticky;left:0;z-index:8", stylesheet.data)
         self.assertIn(b".today-line{position:absolute;z-index:1", stylesheet.data)
         self.assertIn(b".bench-marker-adopted{border-radius:50%;transform:none}", stylesheet.data)
         self.assertIn(b"background:conic-gradient(#3e8060", stylesheet.data)
+        self.assertNotIn(b".reservation-bar::after", stylesheet.data)
+        self.assertIn(
+            b".reservation-bar:hover,.reservation-bar:focus-visible{z-index:6;background:#f1c552",
+            stylesheet.data,
+        )
+        self.assertIn(b".timeline-tooltip{position:fixed;z-index:1000", stylesheet.data)
         self.assertIn(
             b'li[data-list-status="available"] a span:last-child',
             stylesheet.data,
@@ -266,9 +290,39 @@ class AppTests(unittest.TestCase):
         self.client.post("/benches/Bench344/confirm", data=self.form)
         response = self.client.post("/benches/Bench344/confirm", data=self.form)
         self.assertEqual(response.status_code, 409)
-        self.assertIn(b"already booked", response.data)
+        self.assertIn(b"overlap an existing adoption", response.data)
+        self.assertIn(b"Choose other dates", response.data)
         self.assertEqual(
             sum(row["bench_id"] == "Bench344" for row in self.storage.adoptions.values()), 1
+        )
+
+    def test_reserved_bench_accepts_non_overlapping_dates(self) -> None:
+        self.client.post("/benches/Bench344/confirm", data=self.form)
+        later_form = {
+            **self.form,
+            "public_name": "Jordan Lee",
+            "start_date": (self.today + timedelta(days=11)).isoformat(),
+            "end_date": (self.today + timedelta(days=20)).isoformat(),
+        }
+
+        adoption_form = self.client.get("/benches/Bench344/adopt")
+        self.assertEqual(adoption_form.status_code, 200)
+        self.assertIn(b"Choose dates that do not overlap", adoption_form.data)
+        self.assertEqual(
+            self.client.post("/benches/Bench344/review", data=later_form).status_code,
+            200,
+        )
+        confirmation = self.client.post(
+            "/benches/Bench344/confirm", data=later_form
+        )
+
+        self.assertEqual(confirmation.status_code, 303)
+        self.assertEqual(
+            sum(
+                row["bench_id"] == "Bench344"
+                for row in self.storage.adoptions.values()
+            ),
+            2,
         )
 
     def test_invalid_booking_is_not_recorded(self) -> None:

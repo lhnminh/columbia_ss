@@ -11,6 +11,7 @@ from psycopg import Connection, Cursor
 
 from .domain import (
     INITIAL_ADOPTION_COUNT,
+    generated_adopter_name,
     generate_initial_adoption_timelines,
     park_today,
 )
@@ -38,8 +39,16 @@ CREATE TABLE IF NOT EXISTS adoptions (
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
+    is_seeded BOOLEAN NOT NULL DEFAULT FALSE,
     CHECK (end_date > start_date)
 );
+ALTER TABLE adoptions ADD COLUMN IF NOT EXISTS is_seeded BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE adoptions a SET is_seeded = TRUE
+FROM adopters p
+WHERE a.adopter_id = p.id
+  AND a.amount_cents = 10000
+  AND (p.public_name = 'Anonymous Park Supporter'
+       OR p.public_name ~ '^Demo Donor [1-9][0-9]*$');
 CREATE INDEX IF NOT EXISTS adoptions_bench_dates
     ON adoptions (bench_id, end_date, start_date);
 """
@@ -64,6 +73,25 @@ def migrate(connection: Connection[dict[str, Any]]) -> None:
                 cursor.executemany(
                     "UPDATE benches SET latitude = %s, longitude = %s WHERE id = %s",
                     updates,
+                )
+            cursor.execute(
+                """SELECT a.adopter_id, a.bench_id
+                   FROM adoptions a
+                   WHERE a.is_seeded"""
+            )
+            seeded_adopters = [
+                (
+                    generated_adopter_name(
+                        int(row["bench_id"].removeprefix("Bench"))
+                    ),
+                    row["adopter_id"],
+                )
+                for row in cursor.fetchall()
+            ]
+            if seeded_adopters:
+                cursor.executemany(
+                    "UPDATE adopters SET public_name = %s WHERE id = %s",
+                    seeded_adopters,
                 )
             cursor.execute("ALTER TABLE benches ALTER COLUMN latitude SET NOT NULL")
             cursor.execute("ALTER TABLE benches ALTER COLUMN longitude SET NOT NULL")
@@ -96,13 +124,13 @@ def _seed_in_transaction(
     ):
         cursor.execute(
             "INSERT INTO adopters (public_name) VALUES (%s) RETURNING id",
-            ("Anonymous Park Supporter",),
+            (generated_adopter_name(number),),
         )
         adopter_id = cursor.fetchone()["id"]
         cursor.execute(
             """INSERT INTO adoptions
-               (bench_id, adopter_id, start_date, end_date, amount_cents)
-               VALUES (%s, %s, %s, %s, %s)""",
+               (bench_id, adopter_id, start_date, end_date, amount_cents, is_seeded)
+               VALUES (%s, %s, %s, %s, %s, TRUE)""",
             (f"Bench{number}", adopter_id, start, end, 10000),
         )
 
@@ -124,9 +152,7 @@ def _initial_adoption_rows(
         """SELECT a.id, a.bench_id, a.adopter_id, p.public_name
            FROM adoptions a
            JOIN adopters p ON p.id = a.adopter_id
-           WHERE a.amount_cents = 10000
-             AND (p.public_name = 'Anonymous Park Supporter'
-                  OR p.public_name ~ '^Demo Donor [1-9][0-9]*$')
+           WHERE a.is_seeded
            ORDER BY CAST(substring(a.bench_id FROM '[0-9]+') AS INTEGER)
            FOR UPDATE OF a, p""",
     )
@@ -159,7 +185,7 @@ def refresh_timelines(
 def expand_adoptions(
     connection: Connection[dict[str, Any]], *, randomizer: Random | None = None,
 ) -> int:
-    """Add anonymous bookings until 343 benches are currently adopted."""
+    """Add generated bookings until 343 benches are currently adopted."""
     today = park_today()
     with connection.transaction():
         with connection.cursor() as cursor:
@@ -205,15 +231,16 @@ def expand_adoptions(
                 today=today, randomizer=randomizer, count=needed
             )
             for bench_id, (_, start, end) in zip(bench_ids, timelines, strict=True):
+                bench_number = int(bench_id.removeprefix("Bench"))
                 cursor.execute(
                     "INSERT INTO adopters (public_name) VALUES (%s) RETURNING id",
-                    ("Anonymous Park Supporter",),
+                    (generated_adopter_name(bench_number),),
                 )
                 adopter_id = cursor.fetchone()["id"]
                 cursor.execute(
                     """INSERT INTO adoptions
-                       (bench_id, adopter_id, start_date, end_date, amount_cents)
-                       VALUES (%s, %s, %s, %s, %s)""",
+                       (bench_id, adopter_id, start_date, end_date, amount_cents, is_seeded)
+                       VALUES (%s, %s, %s, %s, %s, TRUE)""",
                     (bench_id, adopter_id, start, end, 10000),
                 )
     return needed
@@ -266,9 +293,17 @@ def normalize_content(connection: Connection[dict[str, Any]]) -> int:
                         f"Bench{number}",
                     ),
                 )
-            cursor.execute(
-                "UPDATE adopters SET public_name = 'Anonymous Park Supporter' WHERE id = ANY(%s)",
-                ([row["adopter_id"] for row in initial_rows],),
+            cursor.executemany(
+                "UPDATE adopters SET public_name = %s WHERE id = %s",
+                [
+                    (
+                        generated_adopter_name(
+                            int(row["bench_id"].removeprefix("Bench"))
+                        ),
+                        row["adopter_id"],
+                    )
+                    for row in initial_rows
+                ],
             )
     return 550 + len(initial_rows)
 

@@ -13,6 +13,12 @@ INITIAL_ADOPTION_COUNT = 343
 INITIAL_ACTIVE_ADOPTION_COUNT = 229
 AMOUNT_PATTERN = re.compile(r"\d+(?:\.\d{1,2})?\Z")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
+SEEDED_ADOPTER_FIRST_NAMES = (
+    "Aiden", "Amelia", "Ava", "Benjamin", "Charlotte", "Daniel", "Eleanor",
+    "Elijah", "Emma", "Ethan", "Grace", "Henry", "Isabella", "James",
+    "Leo", "Liam", "Lucas", "Maya", "Mary", "Mia", "Noah", "Olivia",
+    "Petter", "Samuel", "Sophia", "Theodore", "Victoria", "William",
+)
 
 
 class BookingError(ValueError):
@@ -20,12 +26,20 @@ class BookingError(ValueError):
 
 
 class BenchUnavailable(BookingError):
-    """The bench has already been reserved."""
+    """The requested dates overlap an existing bench adoption."""
 
 
 def park_today() -> date:
     """Return today's calendar date in the park's local time zone."""
     return datetime.now(PARK_TIME_ZONE).date()
+
+
+def generated_adopter_name(bench_number: int) -> str:
+    """Return a stable, random-looking public name for a seeded adoption."""
+    generator = Random(917_000 + bench_number)
+    first_name = generator.choice(SEEDED_ADOPTER_FIRST_NAMES)
+    last_initial = generator.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    return f"{first_name} {last_initial}"
 
 
 def generate_initial_adoption_timelines(

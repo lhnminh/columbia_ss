@@ -9,8 +9,12 @@ from typing import Any
 
 from psycopg import Connection, Cursor
 
-from .domain import generate_initial_adoption_timelines, park_today
-from .locations import generated_bench_coordinates
+from .domain import (
+    INITIAL_ADOPTION_COUNT,
+    generate_initial_adoption_timelines,
+    park_today,
+)
+from .locations import generated_bench_coordinates, generated_bench_location
 from .postgres import connect
 
 
@@ -77,7 +81,7 @@ def _seed_in_transaction(
         benches.append(
             (
                 f"Bench{number}",
-                f"Park Area {(number - 1) // 50 + 1} · Site {(number - 1) % 50 + 1}",
+                generated_bench_location(number),
                 latitude,
                 longitude,
             )
@@ -116,22 +120,20 @@ def seed(
 def _initial_adoption_rows(
     cursor: Cursor[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    expected_benches = {f"Bench{number}" for number in range(1, 31)}
     cursor.execute(
         """SELECT a.id, a.bench_id, a.adopter_id, p.public_name
            FROM adoptions a
            JOIN adopters p ON p.id = a.adopter_id
-           WHERE a.bench_id = ANY(%s)
-             AND a.amount_cents = 10000
+           WHERE a.amount_cents = 10000
              AND (p.public_name = 'Anonymous Park Supporter'
-                  OR p.public_name ~ '^Demo Donor ([1-9]|[12][0-9]|30)$')
+                  OR p.public_name ~ '^Demo Donor [1-9][0-9]*$')
+           ORDER BY CAST(substring(a.bench_id FROM '[0-9]+') AS INTEGER)
            FOR UPDATE OF a, p""",
-        (sorted(expected_benches),),
     )
     rows = cursor.fetchall()
-    if len(rows) != 30 or {row["bench_id"] for row in rows} != expected_benches:
+    if not rows:
         raise RuntimeError(
-            "Expected exactly the 30 initial adoptions; no records changed."
+            "Expected at least one initial adoption; no records changed."
         )
     return rows
 
@@ -139,20 +141,115 @@ def _initial_adoption_rows(
 def refresh_timelines(
     connection: Connection[dict[str, Any]], *, randomizer: Random | None = None,
 ) -> int:
-    """Refresh the 30 initial timelines while preserving visitor bookings."""
+    """Refresh seeded timelines while preserving visitor bookings."""
     with connection.transaction():
         with connection.cursor() as cursor:
-            adoption_ids = {
-                row["bench_id"]: row["id"] for row in _initial_adoption_rows(cursor)
-            }
-            for number, start, end in generate_initial_adoption_timelines(
-                today=park_today(), randomizer=randomizer
-            ):
+            rows = _initial_adoption_rows(cursor)
+            timelines = generate_initial_adoption_timelines(
+                today=park_today(), randomizer=randomizer, count=len(rows)
+            )
+            for row, (_, start, end) in zip(rows, timelines, strict=True):
                 cursor.execute(
                     "UPDATE adoptions SET start_date = %s, end_date = %s WHERE id = %s",
-                    (start, end, adoption_ids[f"Bench{number}"]),
+                    (start, end, row["id"]),
                 )
-    return 30
+    return len(rows)
+
+
+def expand_adoptions(
+    connection: Connection[dict[str, Any]], *, randomizer: Random | None = None,
+) -> int:
+    """Add anonymous bookings until 343 benches are currently adopted."""
+    today = park_today()
+    with connection.transaction():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "LOCK TABLE benches, adopters, adoptions IN SHARE ROW EXCLUSIVE MODE"
+            )
+            cursor.execute(
+                """SELECT COUNT(*) AS count
+                   FROM benches b
+                   WHERE EXISTS (
+                       SELECT 1 FROM adoptions a
+                       WHERE a.bench_id = b.id AND a.end_date >= %s
+                   )""",
+                (today,),
+            )
+            current_count = cursor.fetchone()["count"]
+            if current_count > INITIAL_ADOPTION_COUNT:
+                raise RuntimeError(
+                    f"Already found {current_count} adopted benches, above the "
+                    f"{INITIAL_ADOPTION_COUNT}-bench target; no records changed."
+                )
+            needed = INITIAL_ADOPTION_COUNT - current_count
+            if needed == 0:
+                return 0
+            cursor.execute(
+                """SELECT b.id
+                   FROM benches b
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM adoptions a
+                       WHERE a.bench_id = b.id AND a.end_date >= %s
+                   )
+                   ORDER BY CAST(substring(b.id FROM '[0-9]+') AS INTEGER)
+                   LIMIT %s""",
+                (today, needed),
+            )
+            bench_ids = [row["id"] for row in cursor.fetchall()]
+            if len(bench_ids) != needed:
+                raise RuntimeError(
+                    "Not enough available benches to reach the adoption target; "
+                    "no records changed."
+                )
+            timelines = generate_initial_adoption_timelines(
+                today=today, randomizer=randomizer, count=needed
+            )
+            for bench_id, (_, start, end) in zip(bench_ids, timelines, strict=True):
+                cursor.execute(
+                    "INSERT INTO adopters (public_name) VALUES (%s) RETURNING id",
+                    ("Anonymous Park Supporter",),
+                )
+                adopter_id = cursor.fetchone()["id"]
+                cursor.execute(
+                    """INSERT INTO adoptions
+                       (bench_id, adopter_id, start_date, end_date, amount_cents)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (bench_id, adopter_id, start, end, 10000),
+                )
+    return needed
+
+
+def refresh_locations(connection: Connection[dict[str, Any]]) -> int:
+    """Refresh all prototype labels and coordinates without changing bookings."""
+    expected_ids = {f"Bench{number}" for number in range(1, 551)}
+    updates = []
+    for number in range(1, 551):
+        latitude, longitude = generated_bench_coordinates(number)
+        updates.append(
+            (
+                generated_bench_location(number),
+                latitude,
+                longitude,
+                f"Bench{number}",
+            )
+        )
+    with connection.transaction():
+        with connection.cursor() as cursor:
+            cursor.execute("LOCK TABLE benches IN SHARE ROW EXCLUSIVE MODE")
+            cursor.execute("SELECT id FROM benches")
+            actual_ids = {row["id"] for row in cursor.fetchall()}
+            if actual_ids != expected_ids:
+                raise RuntimeError(
+                    "Expected the complete Bench1 through Bench550 inventory; "
+                    "no locations changed."
+                )
+            cursor.executemany(
+                """UPDATE benches
+                   SET location = %s, latitude = %s, longitude = %s
+                   WHERE id = %s""",
+                updates,
+            )
+    return len(updates)
 
 
 def normalize_content(connection: Connection[dict[str, Any]]) -> int:
@@ -165,7 +262,7 @@ def normalize_content(connection: Connection[dict[str, Any]]) -> int:
                     """UPDATE benches SET location = %s
                        WHERE id = %s AND location LIKE 'Demo Zone %%'""",
                     (
-                        f"Park Area {(number - 1) // 50 + 1} · Site {(number - 1) % 50 + 1}",
+                        generated_bench_location(number),
                         f"Bench{number}",
                     ),
                 )
@@ -173,7 +270,7 @@ def normalize_content(connection: Connection[dict[str, Any]]) -> int:
                 "UPDATE adopters SET public_name = 'Anonymous Park Supporter' WHERE id = ANY(%s)",
                 ([row["adopter_id"] for row in initial_rows],),
             )
-    return 580
+    return 550 + len(initial_rows)
 
 
 def reset(
@@ -193,7 +290,11 @@ def main() -> None:
     """Run a migration, seed, or explicit operator reset."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("migrate", "seed", "refresh-timelines", "normalize-content", "reset")
+        "command",
+        choices=(
+            "migrate", "seed", "expand-adoptions", "refresh-timelines",
+            "refresh-locations", "normalize-content", "reset",
+        ),
     )
     parser.add_argument("--yes", action="store_true", help="Confirm the destructive reset")
     args = parser.parse_args()
@@ -206,7 +307,9 @@ def main() -> None:
         {
             "migrate": migrate,
             "seed": seed,
+            "expand-adoptions": expand_adoptions,
             "refresh-timelines": refresh_timelines,
+            "refresh-locations": refresh_locations,
             "normalize-content": normalize_content,
             "reset": reset,
         }[args.command](connection)

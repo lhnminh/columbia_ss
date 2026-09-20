@@ -44,7 +44,10 @@ class PostgresIntegrationTests(unittest.TestCase):
 
     def test_seed_browse_and_exact_amount(self) -> None:
         self.assertEqual(len(postgres.list_benches(self.connection)), 550)
-        self.assertEqual(len(postgres.list_benches(self.connection, search="Park Area 1")), 50)
+        self.assertEqual(
+            len(postgres.list_benches(self.connection, search="Van Cortlandt Park")),
+            550,
+        )
         self.assertEqual(len(postgres.list_benches(self.connection, search="bench31")), 1)
         self.assertEqual(len(postgres.list_benches(self.connection, search="Bench_")), 550)
         bench_one = postgres.get_bench(self.connection, "Bench1")
@@ -55,17 +58,17 @@ class PostgresIntegrationTests(unittest.TestCase):
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT start_date, end_date FROM adoptions")
             timelines = cursor.fetchall()
-        self.assertEqual(sum(row["start_date"] <= today for row in timelines), 20)
-        self.assertEqual(sum(row["start_date"] > today for row in timelines), 10)
+        self.assertEqual(sum(row["start_date"] <= today for row in timelines), 229)
+        self.assertEqual(sum(row["start_date"] > today for row in timelines), 114)
         self.assertEqual(
-            len({(row["start_date"], row["end_date"]) for row in timelines}), 30
+            len({(row["start_date"], row["end_date"]) for row in timelines}), 343
         )
         adoption_id = postgres.create_adoption(
-            self.connection, "Bench31", "Alex", today.isoformat(),
+            self.connection, "Bench344", "Alex", today.isoformat(),
             (today + timedelta(days=10)).isoformat(), "75.25",
         )
         self.assertEqual(postgres.get_adoption(self.connection, adoption_id)["amount_cents"], 7525)
-        self.assertIsNotNone(postgres.get_bench(self.connection, "Bench31")["adoption_id"])
+        self.assertIsNotNone(postgres.get_bench(self.connection, "Bench344")["adoption_id"])
 
     def test_competing_bookings_and_reset(self) -> None:
         today = park_today()
@@ -74,7 +77,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             with self.open_connection() as connection:
                 try:
                     postgres.create_adoption(
-                        connection, "Bench31", name, today.isoformat(),
+                        connection, "Bench344", name, today.isoformat(),
                         (today + timedelta(days=10)).isoformat(), "10",
                     )
                     return "booked"
@@ -84,21 +87,21 @@ class PostgresIntegrationTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=2) as executor:
             self.assertCountEqual(list(executor.map(attempt, ("First", "Second"))),
                                   ["booked", "unavailable"])
-        self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 31)
+        self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 344)
         admin.reset(self.connection)
-        self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 30)
-        self.assertIsNone(postgres.get_bench(self.connection, "Bench31")["adoption_id"])
+        self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 343)
+        self.assertIsNone(postgres.get_bench(self.connection, "Bench344")["adoption_id"])
 
     def test_refresh_timelines_preserves_visitor_booking(self) -> None:
         today = park_today()
         adoption_id = postgres.create_adoption(
-            self.connection, "Bench31", "Visitor", today.isoformat(),
+            self.connection, "Bench344", "Visitor", today.isoformat(),
             (today + timedelta(days=10)).isoformat(), "75.25",
         )
         visitor_before = postgres.get_adoption(self.connection, adoption_id)
 
         self.assertEqual(
-            admin.refresh_timelines(self.connection, randomizer=Random(2027)), 30
+            admin.refresh_timelines(self.connection, randomizer=Random(2027)), 343
         )
 
         visitor_after = postgres.get_adoption(self.connection, adoption_id)
@@ -112,8 +115,66 @@ class PostgresIntegrationTests(unittest.TestCase):
             )
             timelines = cursor.fetchall()
         self.assertEqual(
-            len({(row["start_date"], row["end_date"]) for row in timelines}), 30
+            len({(row["start_date"], row["end_date"]) for row in timelines}), 343
         )
+
+    def test_expand_adoptions_reaches_target_and_preserves_visitor(self) -> None:
+        today = park_today()
+        with self.connection.transaction():
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    """DELETE FROM adoptions
+                       WHERE CAST(substring(bench_id FROM '[0-9]+') AS INTEGER) > 30"""
+                )
+                cursor.execute(
+                    """DELETE FROM adopters p
+                       WHERE NOT EXISTS (
+                           SELECT 1 FROM adoptions a WHERE a.adopter_id = p.id
+                       )"""
+                )
+        visitor_id = postgres.create_adoption(
+            self.connection, "Bench344", "Visitor", today.isoformat(),
+            (today + timedelta(days=10)).isoformat(), "75.25",
+        )
+        visitor_before = postgres.get_adoption(self.connection, visitor_id)
+
+        self.assertEqual(
+            admin.expand_adoptions(self.connection, randomizer=Random(2028)), 312
+        )
+        self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 343)
+        self.assertEqual(postgres.get_adoption(self.connection, visitor_id), visitor_before)
+        self.assertEqual(admin.expand_adoptions(self.connection), 0)
+
+    def test_refresh_locations_preserves_adoptions_and_adopters(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT a.id, a.bench_id, a.adopter_id, a.start_date,
+                          a.end_date, a.amount_cents, p.public_name
+                   FROM adoptions a
+                   JOIN adopters p ON p.id = a.adopter_id
+                   ORDER BY a.id"""
+            )
+            records_before = cursor.fetchall()
+            cursor.execute(
+                """UPDATE benches
+                   SET location = 'Old area', latitude = 0, longitude = 0
+                   WHERE id = 'Bench1'"""
+            )
+
+        self.assertEqual(admin.refresh_locations(self.connection), 550)
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT a.id, a.bench_id, a.adopter_id, a.start_date,
+                          a.end_date, a.amount_cents, p.public_name
+                   FROM adoptions a
+                   JOIN adopters p ON p.id = a.adopter_id
+                   ORDER BY a.id"""
+            )
+            self.assertEqual(cursor.fetchall(), records_before)
+        bench = postgres.get_bench(self.connection, "Bench1")
+        self.assertEqual(bench["location"], "Van Cortlandt Park · Site 1")
+        self.assertNotEqual((bench["latitude"], bench["longitude"]), (0, 0))
 
 
 if __name__ == "__main__":

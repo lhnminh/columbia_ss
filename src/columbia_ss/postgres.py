@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date
 from typing import Any
 
@@ -26,8 +25,6 @@ def list_benches(
     current_date = today or park_today()
     search = search.strip()
     pattern = f"%{search}%"
-    zone = re.fullmatch(r"Park Area (\d+)", search, re.IGNORECASE)
-    location_pattern = f"Park Area {int(zone.group(1))} · %" if zone else pattern
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1 FROM benches WHERE lower(id) = lower(%s)", (search,))
         exact_id = cursor.fetchone() is not None
@@ -48,7 +45,7 @@ def list_benches(
                            OR (%s = 'adopted' AND a.id IS NOT NULL))
             ORDER BY CAST(SUBSTRING(b.id FROM 6) AS INTEGER)
             """,
-            (current_date, search, exact_id, pattern, location_pattern, status, status, status),
+            (current_date, search, exact_id, pattern, pattern, status, status, status),
         )
         return cursor.fetchall()
 

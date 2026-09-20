@@ -30,7 +30,7 @@
     <div class="shell park-nav-inner">
       <a href="{{ url_for('directory') }}">Home</a>
       <a href="{{ url_for('directory') }}#bench-map">Explore benches</a>
-      <a href="{{ url_for('directory') }}#availability-title">Availability</a>
+      <a class="nav-availability" href="{{ url_for('directory') }}#availability-title">Availability</a>
       <a class="nav-action" href="{{ url_for('directory', status='available') }}#bench-map">Find an available bench <span aria-hidden="true">→</span></a>
     </div>
   </nav>

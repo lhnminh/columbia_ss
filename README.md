@@ -15,7 +15,7 @@ uv run python -m columbia_ss.admin seed
 uv run columbia-ss
 ```
 
-Open <http://127.0.0.1:5000>. Local development loads `DATABASE_URL` from the ignored `.env` file, while Vercel supplies the same variable through Project Settings. Both environments exercise the same Postgres persistence code. Bench1–Bench30 receive varied active and future initial timelines; Bench31 is available for exercising the booking flow. All 550 benches receive stable generated coordinates grouped across 11 park areas. These are prototype positions, not surveyed bench locations.
+Open <http://127.0.0.1:5000>. Local development loads `DATABASE_URL` from the ignored `.env` file, while Vercel supplies the same variable through Project Settings. Both environments exercise the same Postgres persistence code. Bench1–Bench343 receive varied active and future initial timelines; Bench344 is available for exercising the booking flow. All 550 benches receive stable coordinates concentrated around 11 hubs inside the checked-in Van Cortlandt Park boundary. Bench numbering rotates through the hubs so the initial adopted benches remain distributed across the park. These are prototype positions, not surveyed bench locations.
 
 ## Test
 
@@ -47,15 +47,33 @@ uv run python -m columbia_ss.admin migrate
 uv run python -m columbia_ss.admin seed
 ```
 
-`migrate` creates the three tables and index, adds coordinate columns to existing installations, and backfills any missing prototype positions. `seed` adds 550 benches and 30 initial adoptions in one transaction. Running either command again preserves existing bookings. App startup does neither operation.
+`migrate` creates the three tables and index, adds coordinate columns to existing installations, and backfills any missing prototype positions. `seed` adds 550 benches and 343 initial adoptions in one transaction. Running either command again preserves existing bookings. App startup does neither operation.
 
-To generate new timelines for the 30 initial adoptions without changing visitor bookings, run:
+After deploying the 343-adoption baseline to an existing database, bring the current total to exactly 343 without changing any visitor-created booking:
+
+```sh
+uv run python -m columbia_ss.admin expand-adoptions
+```
+
+The command is additive and transactional. Existing current or future visitor bookings count toward the 343 total, repeat runs do nothing once the target is reached, and the command refuses to change a database that is already above the target.
+
+Bench positions are generated inside a simplified snapshot of the NYC Parks boundary for Van Cortlandt Park. The map draws the same boundary used by the generator.
+
+After deploying a coordinate-generator update to an existing database, refresh all prototype positions and neutral location labels without changing any bench IDs or bookings:
+
+```sh
+uv run python -m columbia_ss.admin refresh-locations
+```
+
+The update runs in one transaction and expects the complete 550-bench inventory.
+
+To generate new timelines for all anonymous seeded adoptions without changing visitor bookings, run:
 
 ```sh
 uv run python -m columbia_ss.admin refresh-timelines
 ```
 
-The command first verifies that all 30 expected initial records are present. If that check fails, it changes nothing.
+The command first verifies that at least one seeded record is present. If that check fails, it changes nothing.
 
 To verify Postgres behavior before deployment, set `TEST_DATABASE_URL` to a **direct, non-pooled** connection string for a database where you can create a temporary schema, then run the test command above. The integration tests create and remove their own uniquely named schema and cover concurrent booking and reset. The direct URL is needed because the tests use a session-level `search_path`. Without `TEST_DATABASE_URL`, those tests are skipped.
 

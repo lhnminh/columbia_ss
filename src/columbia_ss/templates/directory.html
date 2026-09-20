@@ -2,43 +2,42 @@
 {% block title %}Explore benches{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 {% endblock %}
 {% block content %}
 <section class="home-overview">
-  <div class="shell overview-grid">
-    <div class="overview-copy">
-      <p class="eyebrow">VAN CORTLANDT PARK · THE BRONX</p>
-      <h1>Adopt a bench <em>today.</em></h1>
-      <p>Explore current availability and choose a place to support in Van Cortlandt Park.</p>
-      <div class="summary-counts" aria-label="Bench collection summary">
-        <div><strong>{{ adopted_count }}</strong><span>adopted or reserved</span></div>
-        <div><strong>{{ bench_count - adopted_count }}</strong><span>available now</span></div>
+  <div class="shell home-overview-inner">
+    <div class="overview-grid">
+      <div class="overview-copy">
+        <p class="eyebrow">VAN CORTLANDT PARK · THE BRONX</p>
+        <h1>Adopt a bench <em>today.</em></h1>
+        <p>Your support helps care for Van Cortlandt Park and sustain its daily operations.</p>
+        <div class="summary-counts" aria-label="Bench collection summary">
+          <div><strong>{{ adopted_count }}</strong><span>adopted</span></div>
+          <div><strong>{{ bench_count - adopted_count }}</strong><span>available now</span></div>
+        </div>
       </div>
-    </div>
-    <div class="overview-feature">
-      <img src="{{ url_for('bench_image', filename='vcp010-r.jpg') }}" alt="The Van Cortlandt Park entrance beneath a canopy of trees">
-      <aside class="next-opening" aria-labelledby="next-available-title">
-        <p class="eyebrow" id="next-available-title">NEXT AVAILABLE BENCH</p>
-        {% if next_available %}
-        <h2>{{ next_available.id }}</h2>
-        <p class="next-location">{{ next_available.location }}</p>
-        <p class="opening-date"><span>Status</span><strong>Available now</strong></p>
-        <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=next_available.id) }}">Adopt {{ next_available.id }} <span aria-hidden="true">→</span></a>
-        {% else %}
-        <h2>All benches are reserved</h2>
-        <p>Check the availability map for upcoming openings.</p>
-        {% endif %}
-        <a class="available-link" href="{{ url_for('directory', status='available') }}#bench-map">Browse benches available now →</a>
-      </aside>
+      <div class="overview-feature">
+        <img src="{{ url_for('bench_image', filename='vcp010-r.jpg') }}" alt="The Van Cortlandt Park entrance beneath a canopy of trees">
+        <aside class="next-opening" aria-labelledby="next-available-title">
+          <p class="eyebrow" id="next-available-title">NEXT AVAILABLE BENCH</p>
+          {% if next_available %}
+          <h2>{{ next_available.id }}</h2>
+          <p class="next-location">{{ next_available.location }}</p>
+          <p class="opening-date"><span>Status</span><strong>Available now</strong></p>
+          <a class="button button-dark wide" href="{{ url_for('adoption_form', bench_id=next_available.id) }}">Adopt {{ next_available.id }} <span aria-hidden="true">→</span></a>
+          {% else %}
+          <h2>All benches are reserved</h2>
+          <p>Check the availability map for upcoming openings.</p>
+          {% endif %}
+          <a class="available-link" href="{{ url_for('directory', status='available') }}#bench-map">Browse benches available now →</a>
+        </aside>
+      </div>
     </div>
   </div>
 </section>
 <section class="bench-map-section shell" id="bench-map" aria-labelledby="bench-map-title" data-initial-status="{{ map_status }}">
   <div class="section-heading bench-map-heading">
     <div><p class="eyebrow">PARK DIRECTORY</p><h2 id="bench-map-title">Explore the park.</h2></div>
-    <p>Choose a marker to see where each bench sits and whether it is ready to adopt.</p>
   </div>
   <div class="map-toolbar">
     <div class="map-filters" role="group" aria-label="Filter map by bench status">
@@ -53,7 +52,7 @@
     <aside class="map-selection" id="map-selection" aria-live="polite">
       <p class="eyebrow">SELECT A BENCH</p>
       <h3>Choose a marker</h3>
-      <p>Select any marker to see its status and open the bench details.</p>
+      <p>Adopt a bench today to support our operations.</p>
     </aside>
   </div>
   <details class="accessible-bench-list">
@@ -68,7 +67,7 @@
 <section class="availability shell" aria-labelledby="availability-title">
   <div class="availability-heading">
     <div><p class="eyebrow">PLAN AHEAD</p><h2 id="availability-title">Availability timeline</h2></div>
-    <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted or reserved</span><span><i class="legend-open"></i>Available</span></div>
+    <div class="map-legend" aria-label="Map legend"><span><i class="legend-reserved"></i>Adopted</span><span><i class="legend-open"></i>Available</span></div>
   </div>
   <div class="map-frame" tabindex="0" aria-label="Scrollable bench availability map">
     <div class="gantt-map" style="--today-left: {{ today_position }}%">
@@ -93,7 +92,8 @@
   </div>
 </section>
 <script id="bench-map-data" type="application/json">{{ map_benches|tojson }}</script>
+<script id="park-boundary-data" type="application/json">{{ park_boundary|tojson }}</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
+<script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js" defer></script>
 <script src="{{ url_for('static', filename='directory.js') }}" defer></script>
 {% endblock %}

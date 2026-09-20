@@ -10,11 +10,14 @@
     const section = document.querySelector("#bench-map");
     const mapElement = document.querySelector("#geographic-map");
     const dataElement = document.querySelector("#bench-map-data");
-    if (!section || !mapElement || !dataElement) return;
+    const boundaryElement = document.querySelector("#park-boundary-data");
+    if (!section || !mapElement || !dataElement || !boundaryElement) return;
 
     let benches;
+    let parkBoundary;
     try {
       benches = JSON.parse(dataElement.textContent);
+      parkBoundary = JSON.parse(boundaryElement.textContent);
     } catch (_error) {
       mapElement.textContent = "Bench locations could not be loaded.";
       return;
@@ -26,11 +29,8 @@
     }
 
     const map = window.L.map(mapElement, {
-      center: [40.8975, -73.8945],
-      zoom: 14,
       minZoom: 13,
       maxZoom: 18,
-      maxBounds: [[40.878, -73.918], [40.916, -73.867]],
       maxBoundsViscosity: 0.8,
       scrollWheelZoom: true,
     });
@@ -39,33 +39,28 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    const clusterIcon = (cluster) => {
-      const markers = cluster.getAllChildMarkers();
-      const availableCount = markers.filter((marker) => marker.options.benchAvailable).length;
-      const adoptedCount = markers.length - availableCount;
-      const availableShare = availableCount / markers.length * 100;
-      return window.L.divIcon({
-        className: "bench-cluster-shell",
-        html: `<span class="bench-cluster" style="--available-share:${availableShare}%" aria-label="${availableCount} available and ${adoptedCount} adopted"><b aria-hidden="true">${markers.length}</b></span>`,
-        iconSize: [42, 42],
-        iconAnchor: [21, 21],
-      });
-    };
-
-    const markerLayer = window.L.markerClusterGroup
-      ? window.L.markerClusterGroup({
-        showCoverageOnHover: false,
-        maxClusterRadius: 44,
-        iconCreateFunction: clusterIcon,
-      })
-      : window.L.layerGroup();
-    markerLayer.addTo(map);
+    const boundaryLayer = window.L.geoJSON(parkBoundary, {
+      interactive: false,
+      style: {
+        color: "#315f49",
+        weight: 2,
+        opacity: 0.85,
+        fillColor: "#8fbd7c",
+        fillOpacity: 0.08,
+      },
+    }).addTo(map);
+    const parkBounds = boundaryLayer.getBounds();
+    map.setMaxBounds(parkBounds.pad(0.2));
+    map.fitBounds(parkBounds, { padding: [20, 20] });
 
     const selection = document.querySelector("#map-selection");
     const count = document.querySelector("#map-result-count");
     const countLabel = document.querySelector("#map-result-label");
     const filterButtons = [...section.querySelectorAll("[data-map-filter]")];
     const listRows = [...section.querySelectorAll("[data-list-status]")];
+    const renderedMarkers = window.L.layerGroup().addTo(map);
+    let visibleBenches = benches;
+    let clusterIndex = null;
 
     const markerIcon = (available) => window.L.divIcon({
       className: "bench-marker-shell",
@@ -74,6 +69,17 @@
       iconAnchor: [12, 12],
     });
 
+    const clusterIcon = (total, availableCount) => {
+      const adoptedCount = total - availableCount;
+      const availableShare = availableCount / total * 100;
+      return window.L.divIcon({
+        className: "bench-cluster-shell",
+        html: `<span class="bench-cluster" style="--available-share:${availableShare}%" aria-label="${availableCount} available and ${adoptedCount} adopted"><b aria-hidden="true">${total}</b></span>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+      });
+    };
+
     const clearSelection = () => {
       selection.replaceChildren();
       const eyebrow = document.createElement("p");
@@ -81,9 +87,9 @@
       eyebrow.textContent = "SELECT A BENCH";
       const heading = document.createElement("h3");
       heading.textContent = "Choose a marker";
-      const help = document.createElement("p");
-      help.textContent = "Select any marker to see its status and open the bench details.";
-      selection.append(eyebrow, heading, help);
+      const message = document.createElement("p");
+      message.textContent = "Adopt a bench today to support our operations.";
+      selection.append(eyebrow, heading, message);
     };
 
     const showBench = (bench) => {
@@ -119,31 +125,93 @@
       selection.append(eyebrow, heading, location, status, action);
     };
 
-    benches.forEach((bench) => {
-      bench.marker = window.L.marker([bench.latitude, bench.longitude], {
-        benchAvailable: bench.available,
+    const createBenchMarker = (bench) => {
+      const marker = window.L.marker([bench.latitude, bench.longitude], {
         icon: markerIcon(bench.available),
         title: `${bench.id}, ${bench.available ? "available" : "adopted"}`,
         keyboard: true,
       });
-      bench.marker.bindTooltip(bench.id, { direction: "top", offset: [0, -9] });
-      bench.marker.on("click", () => showBench(bench));
-    });
+      marker.bindTooltip(bench.id, { direction: "top", offset: [0, -9] });
+      marker.on("click", () => showBench(bench));
+      return marker;
+    };
+
+    const renderMarkers = () => {
+      renderedMarkers.clearLayers();
+      if (!clusterIndex) {
+        visibleBenches.forEach((bench) => renderedMarkers.addLayer(createBenchMarker(bench)));
+        return;
+      }
+
+      const bounds = map.getBounds();
+      const features = clusterIndex.getClusters(
+        [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
+        Math.floor(map.getZoom()),
+      );
+      features.forEach((feature) => {
+        const [longitude, latitude] = feature.geometry.coordinates;
+        if (feature.properties.cluster) {
+          const total = feature.properties.point_count;
+          const availableCount = feature.properties.availableCount;
+          const marker = window.L.marker([latitude, longitude], {
+            icon: clusterIcon(total, availableCount),
+            title: `${total} benches`,
+            keyboard: true,
+          });
+          marker.on("click", () => {
+            const expansionZoom = clusterIndex.getClusterExpansionZoom(
+              feature.properties.cluster_id,
+            );
+            map.setView([latitude, longitude], Math.min(expansionZoom, map.getMaxZoom()));
+          });
+          renderedMarkers.addLayer(marker);
+        } else {
+          renderedMarkers.addLayer(
+            createBenchMarker(visibleBenches[feature.properties.benchIndex]),
+          );
+        }
+      });
+    };
+
+    const rebuildClusterIndex = () => {
+      if (!window.Supercluster) {
+        clusterIndex = null;
+        return;
+      }
+      clusterIndex = new window.Supercluster({
+        radius: 120,
+        maxZoom: 17,
+        minPoints: 6,
+        map: (properties) => ({ availableCount: properties.available ? 1 : 0 }),
+        reduce: (accumulated, properties) => {
+          accumulated.availableCount += properties.availableCount;
+        },
+      });
+      clusterIndex.load(visibleBenches.map((bench, benchIndex) => ({
+        type: "Feature",
+        properties: { benchIndex, available: bench.available },
+        geometry: {
+          type: "Point",
+          coordinates: [bench.longitude, bench.latitude],
+        },
+      })));
+    };
 
     const applyFilter = (status) => {
-      markerLayer.clearLayers();
-      const visible = benches.filter((bench) => (
+      visibleBenches = benches.filter((bench) => (
         status === "all" || (status === "available" ? bench.available : !bench.available)
       ));
-      markerLayer.addLayers(visible.map((bench) => bench.marker));
-      if (visible.length) {
+      rebuildClusterIndex();
+      renderedMarkers.clearLayers();
+      if (visibleBenches.length) {
         map.fitBounds(
           window.L.latLngBounds(
-            visible.map((bench) => [bench.latitude, bench.longitude]),
+            visibleBenches.map((bench) => [bench.latitude, bench.longitude]),
           ),
           { padding: [25, 25], maxZoom: 15 },
         );
       }
+      renderMarkers();
       clearSelection();
 
       filterButtons.forEach((button) => {
@@ -154,8 +222,8 @@
       listRows.forEach((row) => {
         row.hidden = status !== "all" && row.dataset.listStatus !== status;
       });
-      count.textContent = String(visible.length);
-      countLabel.textContent = visible.length === 1 ? "bench shown" : "benches shown";
+      count.textContent = String(visibleBenches.length);
+      countLabel.textContent = visibleBenches.length === 1 ? "bench shown" : "benches shown";
 
       const url = new URL(window.location.href);
       if (status === "all") url.searchParams.delete("status");
@@ -166,6 +234,7 @@
     filterButtons.forEach((button) => {
       button.addEventListener("click", () => applyFilter(button.dataset.mapFilter));
     });
+    map.on("moveend", renderMarkers);
     applyFilter(section.dataset.initialStatus || "all");
   };
 

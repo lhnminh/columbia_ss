@@ -22,6 +22,7 @@ from flask import (
 
 from . import postgres
 from .domain import BenchUnavailable, BookingError, park_today, validate_booking
+from .locations import park_boundary_geojson
 
 load_dotenv()
 
@@ -175,6 +176,7 @@ def create_app(
             next_available=next_available,
             availability_rows=availability_rows,
             map_benches=map_benches,
+            park_boundary=park_boundary_geojson(),
             map_status=map_status,
             map_dates=[
                 {

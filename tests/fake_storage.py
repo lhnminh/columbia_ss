@@ -12,7 +12,7 @@ from columbia_ss.domain import (
     park_today,
     validate_booking,
 )
-from columbia_ss.locations import generated_bench_coordinates
+from columbia_ss.locations import generated_bench_coordinates, generated_bench_location
 
 
 class FakeStorage:
@@ -24,9 +24,7 @@ class FakeStorage:
             latitude, longitude = generated_bench_coordinates(number)
             self.benches[f"Bench{number}"] = {
                 "id": f"Bench{number}",
-                "location": (
-                    f"Park Area {(number - 1) // 50 + 1} · Site {(number - 1) % 50 + 1}"
-                ),
+                "location": generated_bench_location(number),
                 "latitude": latitude,
                 "longitude": longitude,
                 "adoption_id": None,

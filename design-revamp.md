@@ -25,7 +25,7 @@ Visitors currently have to scroll past a large introductory section before they 
 2. Benches stay in number order so the map does not unexpectedly rearrange itself.
 3. The map focuses on current and upcoming reservations; completed periods are omitted.
 4. The map shows bench numbers, locations, dates, and availability without public adopter names.
-5. Bench coordinates are stable generated prototype locations grouped across 11 park areas. They are clearly identified as unsurveyed data.
-6. The map uses Leaflet with OpenStreetMap tiles, clusters nearby markers, and retains a list fallback for accessible navigation.
+5. Bench coordinates are stable prototype locations concentrated around 11 hubs inside a checked-in NYC Parks boundary snapshot. Bench numbering rotates through the hubs so adopted benches remain geographically distributed. The positions are clearly identified as unsurveyed data.
+6. The map uses Leaflet with OpenStreetMap tiles, displays the park outline, clusters only groups of at least six nearby markers, and retains a list fallback for accessible navigation.
 
 The revamp is implemented in the home directory page.

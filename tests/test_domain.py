@@ -25,10 +25,10 @@ class DomainTests(unittest.TestCase):
         starts = [start for _, start, _ in timelines]
         ends = [end for _, _, end in timelines]
 
-        self.assertEqual(len(timelines), 30)
-        self.assertEqual(sum(start <= self.today for start in starts), 20)
-        self.assertEqual(sum(start > self.today for start in starts), 10)
-        self.assertEqual(len(set(zip(starts, ends, strict=True))), 30)
+        self.assertEqual(len(timelines), 343)
+        self.assertEqual(len(set(zip(starts, ends, strict=True))), 343)
+        self.assertEqual(sum(start <= self.today for start in starts), 229)
+        self.assertEqual(sum(start > self.today for start in starts), 114)
         self.assertTrue(all(start < end for start, end in zip(starts, ends, strict=True)))
         self.assertTrue(all(end <= self.today + timedelta(days=90) for end in ends))
 

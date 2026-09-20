@@ -9,6 +9,8 @@ from random import Random
 from zoneinfo import ZoneInfo
 
 PARK_TIME_ZONE = ZoneInfo("America/New_York")
+INITIAL_ADOPTION_COUNT = 343
+INITIAL_ACTIVE_ADOPTION_COUNT = 229
 AMOUNT_PATTERN = re.compile(r"\d+(?:\.\d{1,2})?\Z")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 
@@ -28,20 +30,27 @@ def park_today() -> date:
 
 def generate_initial_adoption_timelines(
     *, today: date, randomizer: Random | None = None,
+    count: int = INITIAL_ADOPTION_COUNT,
 ) -> list[tuple[int, date, date]]:
-    """Create varied active and future timelines for the 30 initial adoptions."""
+    """Create varied active and future timelines for seeded adoptions."""
     generator = randomizer or Random()
-    adoption_states = ["active"] * 20 + ["future"] * 10
+    active_count = round(count * INITIAL_ACTIVE_ADOPTION_COUNT / INITIAL_ADOPTION_COUNT)
+    adoption_states = ["active"] * active_count + ["future"] * (count - active_count)
     generator.shuffle(adoption_states)
     timelines = []
+    used_periods: set[tuple[date, date]] = set()
     for number, adoption_state in enumerate(adoption_states, start=1):
-        if adoption_state == "active":
-            start = today - timedelta(days=generator.randint(1, 90))
-            end = today + timedelta(days=generator.randint(7, 90))
-        else:
-            start_offset = generator.randint(1, 60)
-            start = today + timedelta(days=start_offset)
-            end = today + timedelta(days=generator.randint(start_offset + 7, 90))
+        while True:
+            if adoption_state == "active":
+                start = today - timedelta(days=generator.randint(1, 90))
+                end = today + timedelta(days=generator.randint(7, 90))
+            else:
+                start_offset = generator.randint(1, 60)
+                start = today + timedelta(days=start_offset)
+                end = today + timedelta(days=generator.randint(start_offset + 7, 90))
+            if (start, end) not in used_periods:
+                used_periods.add((start, end))
+                break
         timelines.append((number, start, end))
     return timelines
 

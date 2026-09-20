@@ -42,7 +42,7 @@ class PostgresIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         admin.reset(self.connection, randomizer=Random(2026))
 
-    def test_seed_browse_and_exact_amount(self) -> None:
+    def test_seed_browse_and_fixed_daily_price(self) -> None:
         self.assertEqual(len(postgres.list_benches(self.connection)), 550)
         self.assertEqual(
             len(postgres.list_benches(self.connection, search="Van Cortlandt Park")),
@@ -65,9 +65,9 @@ class PostgresIntegrationTests(unittest.TestCase):
         )
         adoption_id = postgres.create_adoption(
             self.connection, "Bench344", "Alex", today.isoformat(),
-            (today + timedelta(days=10)).isoformat(), "75.25",
+            (today + timedelta(days=29)).isoformat(),
         )
-        self.assertEqual(postgres.get_adoption(self.connection, adoption_id)["amount_cents"], 7525)
+        self.assertEqual(postgres.get_adoption(self.connection, adoption_id)["amount_cents"], 9000)
         self.assertIsNotNone(postgres.get_bench(self.connection, "Bench344")["adoption_id"])
 
     def test_competing_bookings_and_reset(self) -> None:
@@ -78,7 +78,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 try:
                     postgres.create_adoption(
                         connection, "Bench344", name, today.isoformat(),
-                        (today + timedelta(days=10)).isoformat(), "10",
+                        (today + timedelta(days=29)).isoformat(),
                     )
                     return "booked"
                 except BenchUnavailable:
@@ -89,8 +89,8 @@ class PostgresIntegrationTests(unittest.TestCase):
                                   ["booked", "unavailable"])
         later_id = postgres.create_adoption(
             self.connection, "Bench344", "Later Visitor",
-            (today + timedelta(days=11)).isoformat(),
-            (today + timedelta(days=20)).isoformat(), "10",
+            (today + timedelta(days=30)).isoformat(),
+            (today + timedelta(days=59)).isoformat(),
         )
         self.assertIsNotNone(later_id)
         self.assertEqual(len(postgres.list_benches(self.connection, status="adopted")), 344)
@@ -102,7 +102,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         today = park_today()
         adoption_id = postgres.create_adoption(
             self.connection, "Bench344", "Visitor", today.isoformat(),
-            (today + timedelta(days=10)).isoformat(), "75.25",
+            (today + timedelta(days=29)).isoformat(),
         )
         visitor_before = postgres.get_adoption(self.connection, adoption_id)
 
@@ -139,7 +139,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 )
         visitor_id = postgres.create_adoption(
             self.connection, "Bench344", "Visitor", today.isoformat(),
-            (today + timedelta(days=10)).isoformat(), "75.25",
+            (today + timedelta(days=29)).isoformat(),
         )
         visitor_before = postgres.get_adoption(self.connection, visitor_id)
 

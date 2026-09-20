@@ -31,6 +31,9 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(sum(start <= self.today for start in starts), 229)
         self.assertEqual(sum(start > self.today for start in starts), 114)
         self.assertTrue(all(start < end for start, end in zip(starts, ends, strict=True)))
+        self.assertTrue(
+            all((end - start).days + 1 >= 30 for start, end in zip(starts, ends, strict=True))
+        )
         self.assertTrue(all(end <= self.today + timedelta(days=90) for end in ends))
 
     def test_generated_adopter_names_are_stable_and_varied(self) -> None:
@@ -40,30 +43,28 @@ class DomainTests(unittest.TestCase):
         self.assertGreater(len(set(names)), 200)
         self.assertTrue(all(name[-2] == " " and name[-1].isupper() for name in names))
 
-    def test_booking_normalizes_name_and_exact_cents(self) -> None:
+    def test_booking_normalizes_name_and_prices_each_inclusive_day(self) -> None:
         name, start, end, cents = validate_booking(
-            "  Alex River  ", self.start, self.end, "125.45", today=self.today
+            "  Alex River  ", self.start, self.end, today=self.today
         )
         self.assertEqual(name, "Alex River")
         self.assertEqual(start, self.start)
         self.assertEqual(end, self.end)
-        self.assertEqual(cents, 12545)
+        self.assertEqual(cents, 31 * 300)
 
-    def test_invalid_dates_amounts_and_name(self) -> None:
+    def test_invalid_dates_and_name(self) -> None:
         invalid = [
-            ("", self.start, self.end, "10"),
-            ("Alex", (self.today - timedelta(days=1)).isoformat(), self.end, "10"),
-            ("Alex", self.start, self.start, "10"),
-            ("Alex", self.start, self.end, "0"),
-            ("Alex", self.start, self.end, "1.234"),
-            ("Alex", self.start, self.end, "NaN"),
-            ("Alex", "2026-02-30", self.end, "10"),
-            ("Alex", self.start, (self.today + timedelta(days=91)).isoformat(), "10"),
+            ("", self.start, self.end),
+            ("Alex", (self.today - timedelta(days=1)).isoformat(), self.end),
+            ("Alex", self.start, self.start),
+            ("Alex", self.start, (self.today + timedelta(days=28)).isoformat()),
+            ("Alex", "2026-02-30", self.end),
+            ("Alex", self.start, (self.today + timedelta(days=91)).isoformat()),
         ]
-        for name, start, end, amount in invalid:
-            with self.subTest(name=name, start=start, end=end, amount=amount):
+        for name, start, end in invalid:
+            with self.subTest(name=name, start=start, end=end):
                 with self.assertRaises(BookingError):
-                    validate_booking(name, start, end, amount, today=self.today)
+                    validate_booking(name, start, end, today=self.today)
 
 
 if __name__ == "__main__":

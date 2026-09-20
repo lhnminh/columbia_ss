@@ -23,8 +23,8 @@ class AppTests(unittest.TestCase):
         self.form = {
             "public_name": "Taylor Rivers",
             "start_date": self.today.isoformat(),
-            "end_date": (self.today + timedelta(days=10)).isoformat(),
-            "amount": "75.25",
+            "end_date": (self.today + timedelta(days=29)).isoformat(),
+            "amount": "90.00",
         }
 
     def test_directory_and_detail_show_both_statuses(self) -> None:
@@ -273,18 +273,30 @@ class AppTests(unittest.TestCase):
         self.assertEqual(list_benches.call_count, 1)
 
     def test_review_then_confirm(self) -> None:
+        form = self.client.get("/benches/Bench344/adopt")
+        self.assertIn(b"Automatically calculated at $3 per day", form.data)
+        self.assertIn(b'name="amount"', form.data)
+        self.assertIn(b"readonly required", form.data)
+        self.assertIn(b'/static/adopt.js', form.data)
+
+        script = self.client.get("/static/adopt.js")
+        self.assertEqual(script.status_code, 200)
+        self.assertIn(b"inclusiveDays * 3", script.data)
+        script.close()
+
         review = self.client.post("/benches/Bench344/review", data=self.form)
         self.assertEqual(review.status_code, 200)
-        self.assertIn(b"$75.25", review.data)
+        self.assertIn(b"Total at $3 per day", review.data)
+        self.assertIn(b"$90.00", review.data)
         self.assertIn(b"No payment is collected", review.data)
         confirmed = self.client.post("/benches/Bench344/confirm", data=self.form)
         self.assertEqual(confirmed.status_code, 303)
         confirmation = self.client.get(confirmed.headers["Location"])
         self.assertIn(b"No online payment was taken", confirmation.data)
-        self.assertIn(b"$75.25", confirmation.data)
+        self.assertIn(b"$90.00", confirmation.data)
         self.assertIn(b"Taylor Rivers", self.client.get("/benches/Bench344").data)
         adoption_id = self.storage.benches["Bench344"]["adoption_id"]
-        self.assertEqual(self.storage.adoptions[adoption_id]["amount_cents"], 7525)
+        self.assertEqual(self.storage.adoptions[adoption_id]["amount_cents"], 9000)
 
     def test_second_submission_is_rejected(self) -> None:
         self.client.post("/benches/Bench344/confirm", data=self.form)
@@ -301,8 +313,8 @@ class AppTests(unittest.TestCase):
         later_form = {
             **self.form,
             "public_name": "Jordan Lee",
-            "start_date": (self.today + timedelta(days=11)).isoformat(),
-            "end_date": (self.today + timedelta(days=20)).isoformat(),
+            "start_date": (self.today + timedelta(days=30)).isoformat(),
+            "end_date": (self.today + timedelta(days=59)).isoformat(),
         }
 
         adoption_form = self.client.get("/benches/Bench344/adopt")
@@ -326,10 +338,10 @@ class AppTests(unittest.TestCase):
         )
 
     def test_invalid_booking_is_not_recorded(self) -> None:
-        invalid_form = {**self.form, "amount": "0"}
+        invalid_form = {**self.form, "end_date": self.form["start_date"]}
         response = self.client.post("/benches/Bench344/review", data=invalid_form)
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b"greater than $0", response.data)
+        self.assertIn(b"must be after the start date", response.data)
         response = self.client.post("/benches/Bench344/confirm", data=invalid_form)
         self.assertEqual(response.status_code, 400)
         self.assertIsNone(self.storage.benches["Bench344"]["adoption_id"])

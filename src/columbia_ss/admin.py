@@ -10,6 +10,7 @@ from typing import Any
 from psycopg import Connection, Cursor
 
 from .domain import (
+    DAILY_ADOPTION_RATE_CENTS,
     INITIAL_ADOPTION_COUNT,
     generated_adopter_name,
     generate_initial_adoption_timelines,
@@ -19,7 +20,7 @@ from .locations import generated_bench_coordinates, generated_bench_location
 from .postgres import connect
 
 
-SCHEMA = """
+SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS benches (
     id TEXT PRIMARY KEY,
     location TEXT NOT NULL,
@@ -49,6 +50,9 @@ WHERE a.adopter_id = p.id
   AND a.amount_cents = 10000
   AND (p.public_name = 'Anonymous Park Supporter'
        OR p.public_name ~ '^Demo Donor [1-9][0-9]*$');
+UPDATE adoptions
+SET amount_cents = (end_date - start_date + 1) * {DAILY_ADOPTION_RATE_CENTS}
+WHERE is_seeded;
 CREATE INDEX IF NOT EXISTS adoptions_bench_dates
     ON adoptions (bench_id, end_date, start_date);
 """
@@ -131,7 +135,10 @@ def _seed_in_transaction(
             """INSERT INTO adoptions
                (bench_id, adopter_id, start_date, end_date, amount_cents, is_seeded)
                VALUES (%s, %s, %s, %s, %s, TRUE)""",
-            (f"Bench{number}", adopter_id, start, end, 10000),
+            (
+                f"Bench{number}", adopter_id, start, end,
+                ((end - start).days + 1) * DAILY_ADOPTION_RATE_CENTS,
+            ),
         )
 
 

@@ -93,13 +93,12 @@ def get_bench(
 
 def create_adoption(
     connection: Connection[dict[str, Any]], bench_id: str, public_name: str,
-    start_date: str, end_date: str,
-    amount: str, *, today: date | None = None,
+    start_date: str, end_date: str, *, today: date | None = None,
 ) -> int:
     """Reserve one bench while holding its row lock."""
     current_date = today or park_today()
     name, start, end, cents = validate_booking(
-        public_name, start_date, end_date, amount, today=current_date
+        public_name, start_date, end_date, today=current_date
     )
     with connection.transaction():
         with connection.cursor() as cursor:

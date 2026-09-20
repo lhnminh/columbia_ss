@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Adopt {{ bench.id }}{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='adopt.js') }}" defer></script>{% endblock %}
 {% block content %}
 <section class="page-section shell narrow">
   <a class="back-link" href="{{ url_for('bench_detail', bench_id=bench.id) }}">← Back to {{ bench.id }}</a>
   <p class="eyebrow">STEP 01 / 02 · YOUR DETAILS</p>
   <h1>Make {{ bench.id }} yours.</h1>
-  <p class="lede">Choose the dates that matter to you, then add a name and a donation amount. You'll review everything before confirming.</p>
+  <p class="lede">Choose at least 30 days that matter to you, then add a public name.</p>
   {% if bench.adoption_id %}<p class="notice">This bench has an adoption from {{ bench.start_date }} through {{ bench.end_date }}. Choose dates that do not overlap it.</p>{% endif %}
   {% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
   <form class="form-panel" method="post" action="{{ url_for('review_adoption', bench_id=bench.id) }}">
-    <div class="form-row"><div class="field"><label for="start_date">Start date</label><input type="date" id="start_date" name="start_date" min="{{ today }}" max="{{ latest_end_date }}" value="{{ values.get('start_date', today) }}" required><span class="field-help">Today or later, using New York dates.</span></div><div class="field"><label for="end_date">End date</label><input type="date" id="end_date" name="end_date" min="{{ today }}" max="{{ latest_end_date }}" value="{{ values.get('end_date', '') }}" required><span class="field-help">This date is included and must be within 90 days.</span></div></div>
+    <div class="form-row"><div class="field"><label for="start_date">Start date</label><input type="date" id="start_date" name="start_date" min="{{ today }}" max="{{ latest_start_date }}" value="{{ values.get('start_date', today) }}" required><span class="field-help">Start today and help care for Van Cortlandt Park.</span></div><div class="field"><label for="end_date">End date</label><input type="date" id="end_date" name="end_date" min="{{ minimum_end_date }}" max="{{ latest_end_date }}" value="{{ values.get('end_date', minimum_end_date) }}" data-minimum-days="{{ minimum_adoption_days }}" required><span class="field-help">Final date included.</span></div></div>
     <div class="field"><label for="public_name">Public adopter name</label><input type="text" id="public_name" name="public_name" maxlength="80" autocomplete="name" placeholder="Your name or a dedication" value="{{ values.get('public_name', '') }}" required><span class="field-help">This name will appear on the bench page.</span></div>
-    <div class="field"><label for="amount">Donation amount (USD)</label><div class="money-input"><span aria-hidden="true">$</span><input type="text" inputmode="decimal" id="amount" name="amount" pattern="[0-9]+(\.[0-9]{1,2})?" placeholder="100.00" value="{{ values.get('amount', '') }}" required></div><span class="field-help">This is a recorded amount only. No payment is taken.</span></div>
+    <div class="field"><label for="amount">Adoption amount (USD)</label><div class="money-input"><span aria-hidden="true">$</span><input type="text" id="amount" name="amount" value="{{ values.get('amount', '') }}" aria-describedby="amount-help" readonly required></div><span class="field-help" id="amount-help">Automatically calculated at $3 per day, including both the start and end dates. No payment is taken.</span></div>
     <button class="button button-dark wide" type="submit">Review booking <span aria-hidden="true">→</span></button>
   </form>
 </section>

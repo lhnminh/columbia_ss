@@ -21,7 +21,13 @@ from flask import (
 )
 
 from . import postgres
-from .domain import BenchUnavailable, BookingError, park_today, validate_booking
+from .domain import (
+    MINIMUM_ADOPTION_DAYS,
+    BenchUnavailable,
+    BookingError,
+    park_today,
+    validate_booking,
+)
 from .locations import park_boundary_geojson
 
 load_dotenv()
@@ -122,6 +128,13 @@ def create_app(
         return {
             "today": today.isoformat(),
             "latest_end_date": (today + timedelta(days=90)).isoformat(),
+            "latest_start_date": (
+                today + timedelta(days=91 - MINIMUM_ADOPTION_DAYS)
+            ).isoformat(),
+            "minimum_end_date": (
+                today + timedelta(days=MINIMUM_ADOPTION_DAYS - 1)
+            ).isoformat(),
+            "minimum_adoption_days": MINIMUM_ADOPTION_DAYS,
             "money": lambda cents: f"${cents // 100:,}.{cents % 100:02d}",
         }
 
@@ -228,12 +241,14 @@ def create_app(
             "amount": request.form.get("amount", ""),
         }
         try:
-            name, start, end, cents = validate_booking(**values)
+            name, start, end, cents = validate_booking(
+                values["public_name"], values["start_date"], values["end_date"]
+            )
         except BookingError as error:
             return render_template("adopt.html", bench=bench, values=values, error=str(error)), 400
         return render_template(
             "review.html", bench=bench, public_name=name, start_date=start,
-            end_date=end, amount=values["amount"], amount_cents=cents,
+            end_date=end, amount=f"{cents / 100:.2f}", amount_cents=cents,
         )
 
     @app.post("/benches/<bench_id>/confirm")
@@ -242,7 +257,6 @@ def create_app(
             "public_name": request.form.get("public_name", ""),
             "start_date": request.form.get("start_date", ""),
             "end_date": request.form.get("end_date", ""),
-            "amount": request.form.get("amount", ""),
         }
         try:
             adoption_id = storage.create_adoption(db(), bench_id, **values)

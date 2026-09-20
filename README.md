@@ -1,6 +1,6 @@
 # Bench by Bench
 
-A responsive bench-adoption service for Van Cortlandt Park. Visitors can explore a prototype geographic map of the bench inventory, filter by availability, see current or future adoptions, and reserve an available bench for chosen calendar dates and a recorded USD amount. No online payment is taken.
+A responsive bench-adoption service for Van Cortlandt Park. Visitors can explore a prototype geographic map of the bench inventory, filter by availability, see current or future adoptions, and reserve an available bench for chosen calendar dates at $3 per day. No online payment is taken.
 
 ## Run locally
 
@@ -25,10 +25,10 @@ uv run python -m unittest discover -s tests -v
 
 ## Adoption rules
 
-- A booking uses the real current date in `America/New_York`. The donor chooses a start date no earlier than today and an end date after the start date.
+- A booking uses the real current date in `America/New_York`. The donor chooses a start date no earlier than today and a period of at least 30 inclusive calendar days.
 - The end date is inclusive. The bench becomes available the next day.
 - A future-dated booking appears immediately in the directory as **Adopted** with its dates. The same bench can receive additional adoptions for non-overlapping date ranges.
-- The amount is stored exactly as integer cents; it is not a payment. A public name is stored for each booking, without contact details or accounts.
+- The $3 daily price is calculated for every calendar day from the start date through the inclusive end date and stored as integer cents; it is not a payment. A public name is stored for each booking, without contact details or accounts.
 - A booking is committed in one Postgres transaction with a bench-row lock, so competing submissions cannot reserve overlapping dates for the same bench.
 - Public bookings must end within 90 days of the current New York date.
 

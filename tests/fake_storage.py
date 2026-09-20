@@ -6,6 +6,7 @@ from datetime import date
 from random import Random
 
 from columbia_ss.domain import (
+    DAILY_ADOPTION_RATE_CENTS,
     BenchUnavailable,
     BookingError,
     generated_adopter_name,
@@ -40,7 +41,8 @@ class FakeStorage:
         ):
             self._store_adoption(
                 bench_id=f"Bench{number}", public_name=generated_adopter_name(number),
-                start_date=start.isoformat(), end_date=end.isoformat(), amount_cents=10000,
+                start_date=start.isoformat(), end_date=end.isoformat(),
+                amount_cents=((end - start).days + 1) * DAILY_ADOPTION_RATE_CENTS,
             )
 
     def connect(self, _database_url: str) -> FakeStorage:
@@ -112,11 +114,11 @@ class FakeStorage:
 
     def create_adoption(
         self, _connection: FakeStorage, bench_id: str, public_name: str,
-        start_date: str, end_date: str, amount: str, *, today: date | None = None,
+        start_date: str, end_date: str, *, today: date | None = None,
     ) -> int:
         current_date = today or park_today()
         name, start, end, cents = validate_booking(
-            public_name, start_date, end_date, amount, today=current_date
+            public_name, start_date, end_date, today=current_date
         )
         if bench_id not in self.benches:
             raise BookingError("This bench does not exist.")
